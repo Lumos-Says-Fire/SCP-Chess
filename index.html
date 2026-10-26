@@ -32,6 +32,9 @@ h1{font:700 1.7rem/1.1 "Franklin Gothic Medium","Arial Narrow",sans-serif;margin
 .sq.chk{background:var(--red)}
 .sq.mv::after{content:"";width:28%;height:28%;border-radius:50%;background:rgba(29,36,34,.35)}
 .sq.cp::after{content:"";position:absolute;inset:4%;border:4px solid rgba(29,36,34,.45);border-radius:50%;width:auto;height:auto;background:none}
+.grey{filter:contrast(.4) brightness(1.6) drop-shadow(0 0 1px #000)}
+.badge{position:absolute;right:3%;bottom:2%;font-size:min(3.6vw,19px);line-height:1;pointer-events:none}
+.badge.dir{right:auto;left:5%;font-size:min(3vw,15px);color:#222}
 .scp{width:84%;height:84%;background:var(--hz);color:#111;border:3px solid #111;border-radius:4px;display:flex;align-items:center;justify-content:center;font:700 min(3.4vw,17px)/1 "Arial Narrow",sans-serif;background-image:repeating-linear-gradient(135deg,transparent 0 7px,rgba(0,0,0,.12) 7px 14px)}
 .scp.moved{outline:3px solid var(--red)}
 aside{width:min(94vw,340px);display:flex;flex-direction:column;gap:12px}
@@ -78,10 +81,10 @@ button:hover{background:var(--hz);color:#111}
 <script>
 /* ---------- SCP definitions: add your own here ---------- */
 const SCPS={
- '173':{name:'SCP-173',title:'The Sculpture',desc:'Moves like a rook but only captures within 3 squares. With no target, it creeps one square toward the nearest piece. Never captures kings.'},
- '049':{name:'SCP-049',title:'Plague Doctor',desc:'Walks one square at a time toward the nearest pawn. After each move, it "cures" every pawn adjacent to it, removing them from the board.'},
- '106':{name:'SCP-106',title:'The Old Man',desc:'Slides like a bishop. Half the time it takes a piece within reach into its pocket dimension; otherwise it wanders.'},
- '682':{name:'SCP-682',title:'Hard-to-Destroy Reptile',desc:'Slides like a queen. Attacks the most valuable piece in reach one time in three; otherwise it wanders. Never captures kings.'},
+ '173':{name:'SCP-173',title:'The Sculpture',desc:'Moves like a rook. Captures a piece whenever it can (never a king), otherwise moves to a random square in reach. It cannot move while any piece is attacking it.'},
+ '049':{name:'SCP-049',title:'Plague Doctor',desc:'Moves one square at a time toward the nearest piece. Each turn, one randomly chosen piece next to it (never a king) turns grey and becomes its own. It can convert the same color at most three times in a row, and only heads toward colors it can currently convert; grey pieces can be captured by either player. Before 049 moves, one grey piece acts: it captures if it can, otherwise it runs as far as it can in a random direction.'},
+ '106':{name:'SCP-106',title:'The Old Man',desc:'Moves one square at a time. Each turn there is a 10% chance it returns a piece it captured to a random empty square (if it has none, it moves instead). Otherwise it takes the lowest-value piece next to it (never a king), or wanders if there is none.'},
+ '330':{name:'SCP-330',title:'Take Only Two',desc:'Never moves, and starts in the center. A piece (not a king) that lands next to it turns into a random rook, bishop or knight and is marked with 🍬. A marked piece that lands next to it again is removed.'},
  '999':{name:'SCP-999',title:'The Tickle Monster',desc:'Friendly. Wanders one square at random. Every piece next to it is protected and cannot be captured.'}
 };
 /* ---------- constants ---------- */
@@ -97,6 +100,8 @@ const nm=sq=>F[sq&7]+(8-(sq>>3));
 const dist=(a,b)=>Math.max(Math.abs((a>>3)-(b>>3)),Math.abs((a&7)-(b&7)));
 const pick=a=>a[Math.random()*a.length|0];
 const other=c=>c==='w'?'b':'w';
+const TN={P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen',K:'king'};
+const pdesc=p=>(p[0]==='w'?'white ':p[0]==='b'?'black ':'grey ')+TN[p[1]];
 
 /* ---------- rules ---------- */
 function attacked(b,sq,by){
@@ -118,7 +123,7 @@ function pseudo(s,color){
   if(!inb(r,c))return 0;
   const t=r*8+c,p=b[t];
   if(!p){add(f,t);return 1}
-  if(p[0]===opp&&!prot(t))add(f,t);
+  if((p[0]===opp||p[0]==='g')&&p[1]!=='K'&&!prot(t))add(f,t);
   return 0;
  };
  for(let f=0;f<64;f++){
@@ -134,7 +139,7 @@ function pseudo(s,color){
    for(const dc of[-1,1]){
     if(!inb(r+d,c+dc))continue;
     const to=(r+d)*8+c+dc,q=b[to];
-    if(q&&q[0]===opp&&!prot(to))push(to);
+    if(q&&(q[0]===opp||q[0]==='g')&&q[1]!=='K'&&!prot(to))push(to);
     else if(!q&&to===s.ep&&!prot(f+dc))add(f,to,{ep:1});
    }
   }else if(t==='N')for(const[d,e]of N)tgt(f,r+d,c+e);
@@ -153,7 +158,7 @@ function pseudo(s,color){
  }
  return out;
 }
-function apply(s,m){
+function apply(s,m,real){
  const b=s.board.slice(),p=b[m.f],col=p[0],rights={...s.rights};
  b[m.t]=m.promo?col+(m.pick||'Q'):p;b[m.f]='';
  if(m.ep)b[m.f+((m.t&7)-(m.f&7))]='';
@@ -162,18 +167,48 @@ function apply(s,m){
   else{b[row*8+3]=b[row*8];b[row*8]=''}}
  if(p[1]==='K'){rights[col+'K']=rights[col+'Q']=false}
  for(const q of[m.f,m.t]){if(q===63)rights.wK=false;if(q===56)rights.wQ=false;if(q===7)rights.bK=false;if(q===0)rights.bQ=false}
- return{...s,board:b,rights,ep:m.dp?(m.f+m.t)/2:-1,turn:other(col)};
+
+ const marks=s.marks.slice();marks[m.t]=marks[m.f];marks[m.f]=0;
+ if(m.castle){const row=m.f>>3,[a,z]=m.castle==='K'?[7,5]:[0,3];marks[row*8+z]=marks[row*8+a];marks[row*8+a]=0}
+ let note='';
+ if(s.scp.id==='330'&&b[m.t]&&b[m.t][1]!=='K'&&dist(m.t,s.scp.sq)===1){
+  if(marks[m.t]){note=`The ${pdesc(b[m.t])} is removed by SCP-330.`;b[m.t]='';}
+  else if(real){const nt=pick(['R','B','N']);b[m.t]=col+nt;marks[m.t]=1;note=`SCP-330 turns the piece on ${nm(m.t)} into a ${TN[nt]}.`}
+ }
+ for(let i=0;i<64;i++)if(!b[i])marks[i]=0;
+ return{...s,board:b,rights,marks,note,ep:m.dp&&b[m.t]&&b[m.t][1]==='P'?(m.f+m.t)/2:-1,turn:other(col)};
 }
 const kingSq=(b,c)=>b.indexOf(c+'K');
 const inCheck=(s,c)=>attacked(s.board,kingSq(s.board,c),other(c));
 const legal=(s,c)=>pseudo(s,c).filter(m=>!inCheck(apply(s,m),c));
 
 /* ---------- SCP behaviour ---------- */
+function greyOptions(b,f){
+ const p=b[f],t=p[1],r=f>>3,c=f&7,caps=[],rays=[];
+ const tg=q=>{const x=b[q];return x&&x!=='S'&&x[0]!=='g'&&x[1]!=='K'};
+ if(t==='P'){
+  const d=p[2]==='w'?-1:1,st=p[2]==='w'?6:1,ray=[];
+  if(inb(r+d,c)&&!b[(r+d)*8+c]){ray.push((r+d)*8+c);if(r===st&&!b[(r+2*d)*8+c])ray.push((r+2*d)*8+c)}
+  if(ray.length)rays.push(ray);
+  for(const dc of[-1,1])if(inb(r+d,c+dc)&&tg((r+d)*8+c+dc))caps.push((r+d)*8+c+dc);
+ }else{
+  const one=t==='N'||t==='K',ds=t==='N'?N:t==='R'?ORTH:t==='B'?DIAG:K;
+  for(const[d,e]of ds){
+   const ray=[];let y=r+d,x=c+e;
+   while(inb(y,x)){
+    const q=y*8+x;
+    if(!b[q])ray.push(q);else{if(tg(q))caps.push(q);break}
+    if(one)break;y+=d;x+=e;
+   }
+   if(ray.length)rays.push(ray);
+  }
+ }
+ return{caps,rays};
+}
 function scpTurn(s){
- const b=s.board.slice(),sc=s.scp,id=sc.id,from=sc.sq,r=from>>3,c=from&7;
- const targets=[];
- b.forEach((p,i)=>{if(p&&p!=='S'&&p[1]!=='K')targets.push(i)});
- const near=(t,L=targets)=>L.length?Math.min(...L.map(q=>dist(q,t))):0;
+ const b=s.board.slice(),sc=s.scp,id=sc.id,from=sc.sq,r=from>>3,c=from&7,me=SCPS[id].name;
+ const held=(sc.held||[]).slice(),parts=[],st={...(sc.streak||{c:'',n:0})},blocked=st.n>=3?st.c:'';
+ const near=(t,L)=>L.length?Math.min(...L.map(q=>dist(q,t))):0;
  const reach=(ds,max,canCap)=>{
   const o=[];
   for(const[d,e]of ds){
@@ -188,40 +223,61 @@ function scpTurn(s){
   return o;
  };
  const best=(o,L)=>{const m=Math.min(...o.map(x=>near(x.t,L)));return pick(o.filter(x=>near(x.t,L)===m))};
- const strongest=o=>{const m=Math.max(...o.map(x=>VAL[b[x.t][1]]));return pick(o.filter(x=>VAL[b[x.t][1]]===m))};
- let o,ch=null,note='';
+ let o,ch=null;
  if(id==='173'){
-  o=reach(ORTH,3,true);const caps=o.filter(x=>x.cap);
-  ch=caps.length?strongest(caps):(o=reach(ORTH,1,false)).length?best(o):null;
+  if(attacked(b,from,'w')||attacked(b,from,'b'))parts.push(`${me} is under attack and cannot move.`);
+  else{o=reach(ORTH,8,true);const caps=o.filter(x=>x.cap);ch=caps.length?pick(caps):o.length?pick(o):null}
  }else if(id==='049'){
-  o=reach(K,1,false);
-  const pawns=targets.filter(i=>b[i][1]==='P'),L=pawns.length?pawns:targets;
-  ch=o.length?best(o,L):null;
+  const greys=[];b.forEach((p,i)=>{if(p&&p[0]==='g')greys.push(i)});
+  const acts=greys.map(i=>({i,o:greyOptions(b,i)})).filter(a=>a.o.caps.length||a.o.rays.length);
+  if(acts.length){
+   const a=pick(acts),p=b[a.i];let to,took=null;
+   if(a.o.caps.length){to=pick(a.o.caps);took=b[to]}
+   else{const ray=pick(a.o.rays);to=ray[ray.length-1]}
+   b[to]=p;b[a.i]='';
+   parts.push(`A grey ${TN[p[1]]} moves ${nm(a.i)}-${nm(to)}`+(took?`, taking a ${pdesc(took)}.`:'.'));
+  }
+  const L=[];b.forEach((p,i)=>{if(p&&p!=='S'&&p[0]!=='g'&&p[1]!=='K'&&p[0]!==blocked)L.push(i)});
+  o=reach(K,1,false);ch=o.length?best(o,L):null;
  }else if(id==='106'){
-  o=reach(DIAG,8,true);const caps=o.filter(x=>x.cap);
-  ch=caps.length&&Math.random()<.5?pick(caps):o.length?pick(o):null;
- }else if(id==='682'){
-  o=reach(K,8,true);const caps=o.filter(x=>x.cap);
-  ch=caps.length&&Math.random()<1/3?strongest(caps):(o=o.filter(x=>!x.cap)).length?pick(o):null;
- }else{
+  // One roll: 10% return a piece it captured, 90% move. A return that can't happen falls back to a move.
+  if(held.length&&Math.random()<.1){
+   const opts=[];
+   held.forEach((pc,k)=>{for(let q=0;q<64;q++)if(!b[q]&&!(pc[1]==='P'&&((q>>3)===0||(q>>3)===7)))opts.push([k,q])});
+   if(opts.length){
+    const[k,q]=pick(opts),pc=held[k];
+    b[q]=pc;held.splice(k,1);parts.push(`${me} returns a ${pdesc(pc)} to ${nm(q)}.`);
+   }
+  }
+  if(!parts.length){
+   o=reach(K,1,true);
+   const caps=o.filter(x=>x.cap),mv=o.filter(x=>!x.cap);
+   if(caps.length){
+    const m=Math.min(...caps.map(x=>VAL[b[x.t][1]]));
+    ch=pick(caps.filter(x=>VAL[b[x.t][1]]===m));held.push(b[ch.t]);
+   }else ch=mv.length?pick(mv):null;
+  }
+ }else if(id==='999'){
   o=reach(K,1,false);ch=o.length?pick(o):null;
  }
- let log=`${SCPS[id].name} stays put.`;
  if(ch){
   const taken=b[ch.t];
   b[from]='';b[ch.t]='S';sc.sq=ch.t;
-  log=`${SCPS[id].name} moves to ${nm(ch.t)}`+(ch.cap?`, taking a ${taken[0]==='w'?'white':'black'} ${({P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen'})[taken[1]]}.`:'.');
- }
+  parts.push(`${me} moves to ${nm(ch.t)}`+(ch.cap?`, taking a ${pdesc(taken)}.`:'.'));
+ }else if(id!=='330'&&!parts.length)parts.push(`${me} stays put.`);
  if(id==='049'){
-  const cured=[];
-  for(const[d,e]of K){const y=(sc.sq>>3)+d,x=(sc.sq&7)+e;
-   if(inb(y,x)&&b[y*8+x]&&b[y*8+x][1]==='P'){cured.push(nm(y*8+x));b[y*8+x]=''}}
-  if(cured.length)log+=` It cures the pawn${cured.length>1?'s':''} on ${cured.join(', ')}.`;
+  const cand=[];
+  for(const[d,e]of K){
+   const y=(sc.sq>>3)+d,x=(sc.sq&7)+e,q=y*8+x;
+   if(inb(y,x)&&b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K'&&b[q][0]!==blocked)cand.push(q);
+  }
+  if(cand.length){const q=pick(cand);const col=b[q][0];st.n=st.c===col?st.n+1:1;st.c=col;parts.push(`The ${pdesc(b[q])} on ${nm(q)} turns grey.`);b[q]='g'+b[q][1]+b[q][0]}
  }
- const rights={...s.rights};
+ const rights={...s.rights},marks=s.marks.slice();
  if(b[63]!=='wR')rights.wK=false;if(b[56]!=='wR')rights.wQ=false;
  if(b[7]!=='bR')rights.bK=false;if(b[0]!=='bR')rights.bQ=false;
- return{state:{...s,board:b,rights,ep:-1,scp:{...sc}},log,moved:ch?ch.t:-1};
+ for(let i=0;i<64;i++)if(!b[i])marks[i]=0;
+ return{state:{...s,board:b,rights,marks,note:'',ep:-1,scp:{...sc,held,streak:st}},log:parts.join(' '),moved:ch?ch.t:-1};
 }
 
 /* ---------- game state ---------- */
@@ -231,9 +287,9 @@ function newGame(){
  for(let i=0;i<8;i++){b[i]='b'+back[i];b[8+i]='bP';b[48+i]='wP';b[56+i]='w'+back[i]}
  const forced=document.getElementById('force').value;
  const id=forced||pick(Object.keys(SCPS));
- const sq=(3+(Math.random()*2|0))*8+(Math.random()<.5?0:7); // ranks 4-5, a/h files
+ const sq=id==='330'?pick([27,28,35,36]):(3+(Math.random()*2|0))*8+(Math.random()<.5?0:7); // 330: center; others: ranks 4-5, a/h files
  b[sq]='S';
- G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,scp:{id,sq},over:false,msg:''};
+ G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',scp:{id,sq,held:[],streak:{c:'',n:0}},over:false,msg:''};
  sel=null;hints=[];lastScp=-1;
  logs=[`${SCPS[id].name} has breached containment at ${nm(sq)}.`];
  render();
@@ -261,10 +317,11 @@ function askPromo(m){
 }
 function play(m){
  const who=G.turn,p=G.board[m.f],cap=G.board[m.t];
- G=apply(G,m);sel=null;hints=[];lastScp=-1;
+ G=apply(G,m,true);sel=null;hints=[];lastScp=-1;
  logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`);
+ if(G.note)logs.push(G.note);
  if(who==='b'&&!finish()){
-  const res=scpTurn(G);G=res.state;lastScp=res.moved;logs.push(res.log);
+  const res=scpTurn(G);G=res.state;lastScp=res.moved;if(res.log)logs.push(res.log);
  }
  finish();
  render();
@@ -293,7 +350,15 @@ function render(){
   const h=hints.find(m=>m.t===i);
   if(h)d.classList.add(p||h.ep?'cp':'mv');
   if(p==='S'){d.innerHTML=`<div class="scp${i===lastScp?' moved':''}" title="${SCPS[G.scp.id].name}">${G.scp.id}</div>`}
-  else if(p){const im=document.createElement('img');im.src=pieceUrl(p);im.alt=(p[0]==='w'?'White ':'Black ')+p[1];im.draggable=false;im.referrerPolicy='no-referrer';d.appendChild(im)}
+  else if(p){
+   const grey=p[0]==='g',im=document.createElement('img');
+   im.src=pieceUrl(grey?'b'+p[1]:p);im.alt=pdesc(p);im.draggable=false;im.referrerPolicy='no-referrer';
+   if(grey)im.className='grey';
+   d.appendChild(im);
+   const badge=(t,cls)=>{const e=document.createElement('span');e.className='badge '+cls;e.textContent=t;d.appendChild(e)};
+   if(G.marks[i])badge('🍬','');
+   if(grey&&p[1]==='P')badge(p[2]==='w'?'▲':'▼','dir');
+  }
   d.onclick=()=>click(i);
   d.setAttribute('aria-label',nm(i)+(p?' '+p:''));
   el.appendChild(d);
