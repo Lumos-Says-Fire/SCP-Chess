@@ -35,7 +35,18 @@ body.on-menu footer{border-color:#2b332f;opacity:1;color:#c9cfc6}
 .mgrid{display:grid;grid-template-columns:calc(var(--u)*872) calc(var(--u)*556);grid-template-rows:repeat(3,calc(var(--u)*140));gap:calc(var(--u)*26) calc(var(--u)*28);margin:calc(var(--u)*98) 0 0 calc(var(--u)*108)}
 .box{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 calc(var(--u)*30);line-height:1.45}
 .scpbox{grid-column:2;grid-row:1/3}
-.timerbox{grid-column:2;grid-row:3;font-size:calc(var(--u)*42);line-height:1.25}
+.timerbox{grid-column:2;grid-row:3;gap:calc(var(--u)*10);padding:0 calc(var(--u)*22)}
+.chip{flex:1;min-width:0;height:calc(var(--u)*100);display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(23,28,26,.14);color:#fff;border:calc(var(--u)*4) solid transparent;border-radius:calc(var(--u)*34);font:inherit;cursor:pointer;padding:0}
+.chip b{font-size:calc(var(--u)*38);line-height:1;white-space:nowrap}
+.chip small{font-size:calc(var(--u)*24);line-height:1.1;font-weight:700}
+.chip:hover{background:rgba(23,28,26,.28)}
+.chip:focus-visible{outline:3px solid var(--hz);outline-offset:2px}
+.chip[aria-checked=true]{background:#171c1a;border-color:#171c1a}
+.clk{display:flex;justify-content:space-between;align-items:baseline;padding:6px 10px;border-left:6px solid transparent}
+.clk b{font:700 1.7rem/1.2 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.clk.on{border-left-color:var(--hz);background:var(--lt)}
+.clk.low b{color:var(--red)}
+#tcl{font-size:.8rem;opacity:.75;margin-top:6px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 16px;border-left:6px solid var(--hz);font:600 .95rem system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
 body.on-menu #toast{background:#e4e6df;color:#171c1a}
@@ -45,7 +56,9 @@ body.on-menu #toast{background:#e4e6df;color:#171c1a}
  .login{margin-top:0;width:100%;max-width:calc(var(--u)*562)}
  .mgrid{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto;margin:calc(var(--u)*70) calc(var(--u)*50) 0}
  .mgrid .pill{height:calc(var(--u)*140)}
- .scpbox,.timerbox{grid-column:1 !important;grid-row:auto !important;padding:calc(var(--u)*24) calc(var(--u)*40)}
+ .scpbox,.timerbox{grid-column:1 !important;grid-row:auto !important}
+ .scpbox{padding:calc(var(--u)*24) calc(var(--u)*40)}
+ .timerbox{padding:calc(var(--u)*20) calc(var(--u)*24)}
  .scpbox{min-height:calc(var(--u)*290)}
  .timerbox{min-height:calc(var(--u)*140)}
 }
@@ -95,7 +108,13 @@ button:hover{background:var(--hz);color:#111}
     <div class="box scpbox">[Insert SCP selection interface here]</div>
     <button class="pill" id="goLocal" style="grid-column:1;grid-row:2">Local Multiplayer</button>
     <button class="pill soon" style="grid-column:1;grid-row:3" data-msg="Singleplayer vs AI is coming soon.">Singleplayer VS AI</button>
-    <div class="box timerbox">[Insert timer selection interface here]</div>
+    <div class="box timerbox" role="radiogroup" aria-label="Time control">
+      <button class="chip" role="radio" aria-checked="true" data-base="600" data-inc="0" data-label="10 minutes"><b>10</b><small>min</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-base="300" data-inc="0" data-label="5 minutes"><b>5</b><small>min</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-base="180" data-inc="2" data-label="3 minutes + 2 seconds per move" aria-label="3 minutes plus 2 seconds per move"><b>3 | 2</b><small>min</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-base="180" data-inc="0" data-label="3 minutes"><b>3</b><small>min</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-base="60" data-inc="0" data-label="1 minute"><b>1</b><small>min</small></button>
+    </div>
   </div>
 </section>
 <div id="toast" role="status" aria-live="polite"></div>
@@ -107,6 +126,11 @@ button:hover{background:var(--hz);color:#111}
 <div class="play">
 <div id="board" role="grid" aria-label="Chess board"></div>
 <aside>
+  <div class="card" id="clocks">
+    <div class="clk" id="clkb"><span>Black</span><b>0:00</b></div>
+    <div class="clk" id="clkw"><span>White</span><b>0:00</b></div>
+    <div id="tcl"></div>
+  </div>
   <div class="card"><div id="status"></div></div>
   <div class="card" id="scpcard"></div>
   <div class="row">
@@ -127,7 +151,8 @@ button:hover{background:var(--hz);color:#111}
 </div>
 <footer>SCP Foundation emblem by <a href="https://commons.wikimedia.org/w/index.php?curid=116232773">ZiYueCommentary</a> (own work based on SCP Foundation (emblem).svg), <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>, via Wikimedia Commons. Piece graphics by Cburnett via <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>, licensed <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>.</footer>
 <script>
-/* ---------- SCP definitions: add your own here ---------- */
+const $=id=>document.getElementById(id);
+/* ---------- SCP definitions ---------- */
 const SCPS={
  '018':{name:'SCP-018',title:'Super Ball',desc:'Moves like a bishop, always as far as it can go. Its first move is in a random direction; after that it bounces. Off a side wall it reverses horizontally, off the top or bottom wall (or after capturing a piece) it reverses vertically, and off a corner or a king it reverses both. It captures any non-king piece it runs into.'},
  '173':{name:'SCP-173',title:'The Sculpture',desc:'Moves like a rook. Captures a piece whenever it can (never a king), otherwise moves to a random square in reach. It cannot move while any piece is attacking it.'},
@@ -363,6 +388,42 @@ function scpTurn(s){
  return{state:{...s,board:b,rights,marks,note:'',ep:-1,scp:{...sc,held,streak:st}},log:parts.join(' '),moved:ch?ch.t:-1};
 }
 
+/* ---------- chess clock ---------- */
+// Clocks start after White's first move (that move is untimed, and earns no increment).
+let timeCtl={base:600,inc:0,label:'10 minutes'};
+const clk={w:600,b:600,inc:0,running:false,last:0};
+const live=c=>clk[c]-(clk.running&&!G.over&&G.turn===c?(performance.now()-clk.last)/1000:0);
+function fmt(t){
+ t=Math.max(0,t);
+ if(t<10)return '0:0'+(Math.floor(t*10)/10).toFixed(1);
+ return Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
+}
+function drawClocks(){
+ for(const c of 'wb'){
+  const t=live(c),el=$('clk'+c);
+  el.querySelector('b').textContent=fmt(t);
+  el.classList.toggle('on',!G.over&&G.turn===c);
+  el.classList.toggle('low',t<10);
+ }
+}
+function resetClocks(){
+ clk.w=clk.b=timeCtl.base;clk.inc=timeCtl.inc;clk.running=false;
+ $('tcl').textContent='Time control: '+timeCtl.label+'. Clocks start after White\'s first move.';
+ drawClocks();
+}
+function timeout(c){
+ clk[c]=0;clk.running=false;
+ const win=other(c),has=G.board.some(p=>p&&p!=='S'&&p[0]===win&&p[1]!=='K');
+ G.over=true;sel=null;hints=[];$('promo').hidden=true;
+ G.msg=has?`${c==='w'?'White':'Black'} ran out of time. ${win==='w'?'White':'Black'} wins.`:`${c==='w'?'White':'Black'} ran out of time, but ${win==='w'?'White':'Black'} has only a king. The game is drawn.`;
+ logs.push(G.msg);render();
+}
+setInterval(()=>{
+ if($('gameScreen').hidden)return;
+ if(!G.over&&clk.running&&live(G.turn)<=0)timeout(G.turn);
+ drawClocks();
+},100);
+
 /* ---------- game state ---------- */
 let G,sel=null,hints=[],logs=[],lastScp=-1;
 function newGame(){
@@ -374,6 +435,7 @@ function newGame(){
  b[sq]='S';
  G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0},dir:null},over:false,msg:''};
  G.hist[posKey(G)]=1;
+ resetClocks();
  sel=null;hints=[];lastScp=-1;
  logs=[`${SCPS[id].name} has breached containment at ${nm(sq)}.`];
  render();
@@ -400,8 +462,11 @@ function askPromo(m){
  box.hidden=false;opts.firstChild.focus();
 }
 function play(m){
- const who=G.turn,p=G.board[m.f],cap=G.board[m.t],sig0=sig(G);
- G=apply(G,m,true);sel=null;hints=[];lastScp=-1;
+ if(G.over)return;
+ const who=G.turn,p=G.board[m.f],cap=G.board[m.t],sig0=sig(G),now=performance.now();
+ if(clk.running){clk[who]-=(now-clk.last)/1000;clk.last=now;if(clk[who]<=0){timeout(who);return}}
+ G=apply(G,m,true);
+ if(!clk.running){clk.running=true;clk.last=now}else clk[who]+=clk.inc;sel=null;hints=[];lastScp=-1;
  logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`);
  if(G.note)logs.push(G.note);
  if(who==='b'&&!finish(false)){
@@ -473,7 +538,6 @@ for(const k of Object.keys(SCPS).sort()){const o=document.createElement('option'
 document.getElementById('promocancel').onclick=()=>{document.getElementById('promo').hidden=true};
 document.getElementById('new').onclick=()=>{document.getElementById('promo').hidden=true;newGame()};
 newGame();
-const $=id=>document.getElementById(id);
 function show(name){
  const m=name==='menu';
  $('menu').hidden=!m;$('gameScreen').hidden=m;
@@ -486,6 +550,10 @@ let toastTimer;
 document.querySelectorAll('.soon').forEach(b=>b.onclick=()=>{
  const t=$('toast');t.textContent=b.dataset.msg;t.classList.add('on');
  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('on'),2200);
+});
+document.querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+ document.querySelectorAll('.chip').forEach(x=>x.setAttribute('aria-checked',String(x===ch)));
+ timeCtl={base:+ch.dataset.base,inc:+ch.dataset.inc,label:ch.dataset.label};
 });
 show('menu');
 </script>
