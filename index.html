@@ -289,7 +289,8 @@ function newGame(){
  const id=forced||pick(Object.keys(SCPS));
  const sq=id==='330'?pick([27,28,35,36]):(3+(Math.random()*2|0))*8+(Math.random()<.5?0:7); // 330: center; others: ranks 4-5, a/h files
  b[sq]='S';
- G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',scp:{id,sq,held:[],streak:{c:'',n:0}},over:false,msg:''};
+ G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0}},over:false,msg:''};
+ G.hist[posKey(G)]=1;
  sel=null;hints=[];lastScp=-1;
  logs=[`${SCPS[id].name} has breached containment at ${nm(sq)}.`];
  render();
@@ -316,23 +317,37 @@ function askPromo(m){
  box.hidden=false;opts.firstChild.focus();
 }
 function play(m){
- const who=G.turn,p=G.board[m.f],cap=G.board[m.t];
+ const who=G.turn,p=G.board[m.f],cap=G.board[m.t],sig0=sig(G);
  G=apply(G,m,true);sel=null;hints=[];lastScp=-1;
  logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`);
  if(G.note)logs.push(G.note);
- if(who==='b'&&!finish()){
+ if(who==='b'&&!finish(false)){
   const res=scpTurn(G);G=res.state;lastScp=res.moved;if(res.log)logs.push(res.log);
  }
- finish();
+ G.clock=(p[1]==='P'||sig(G)!==sig0)?0:G.clock+1;
+ finish(true);
  render();
 }
-function finish(){
+/* ---------- draw rules ---------- */
+// Pieces on the board with candy marks, used to spot irreversible changes (captures, conversions, returns).
+const sig=s=>s.board.map((p,i)=>p&&p!=='S'?p+(s.marks[i]?'*':''):'').filter(Boolean).sort().join(',');
+function posKey(s){
+ const ep=s.ep>=0&&pseudo(s,s.turn).some(m=>m.ep)?s.ep:-1,sc=s.scp;
+ return s.board.map((p,i)=>p+(s.marks[i]?'*':'')).join(',')+'|'+s.turn+Object.values(s.rights).map(Number).join('')+ep+'|'+(sc.held||[]).slice().sort().join('')+(sc.streak?sc.streak.c+sc.streak.n:'');
+}
+// Only bare kings are a dead position: the SCP can act as a blocker and 330 can upgrade pieces,
+// so king + minor piece can still mate. 106 can also bring captured pieces back.
+const dead=s=>!(s.scp.held||[]).length&&s.board.every(p=>!p||p==='S'||p[0]==='g'||p[1]==='K');
+function finish(full){
+ if(G.over)return true;
  const t=G.turn,n=legal(G,t).length,chk=inCheck(G,t);
- if(!n){
-  G.over=true;
-  G.msg=chk?`Checkmate. ${t==='w'?'Black':'White'} wins.`:'Stalemate. The game is drawn.';
-  logs.push(G.msg);
-  return true;
+ const end=msg=>{G.over=true;G.msg=msg;logs.push(msg);return true};
+ if(!n)return end(chk?`Checkmate. ${t==='w'?'Black':'White'} wins.`:'Stalemate. The game is drawn.');
+ if(full){
+  const k=posKey(G);G.hist[k]=(G.hist[k]||0)+1;
+  if(G.hist[k]>=3)return end('Draw by threefold repetition.');
+  if(G.clock>=100)return end('Draw by the 50-move rule.');
+  if(dead(G))return end('Draw: only the kings remain, so checkmate is impossible.');
  }
  G.msg=`${t==='w'?'White':'Black'} to move${chk?' (in check)':''}`;
  return false;
