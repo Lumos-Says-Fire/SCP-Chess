@@ -14,6 +14,11 @@ main{max-width:980px;margin:0 auto;padding:20px 14px 24px}
 header{margin-bottom:14px}
 footer{max-width:980px;margin:0 auto;padding:14px;border-top:1px solid var(--line);font-size:.82rem;opacity:.75;text-align:center}
 footer a{color:inherit}
+#promo{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:10}
+#promo[hidden]{display:none}
+#promo .dlg{background:var(--panel);border-left:6px solid var(--hz);padding:16px;display:flex;flex-direction:column;gap:10px;align-items:center;font-weight:700}
+#promo .row button{width:72px;height:72px;padding:4px;background:var(--lt)}
+#promo img{width:100%;height:100%;display:block}
 details.hist{width:min(94vw,924px);margin:18px auto 0}
 details.card summary{cursor:pointer;font-weight:700}
 details.card[open] summary{margin-bottom:8px}
@@ -35,7 +40,8 @@ aside{width:min(94vw,340px);display:flex;flex-direction:column;gap:12px}
 .card p{margin:4px 0 0;font-size:.92rem}
 #status{font-weight:700}
 #status.end{color:var(--red)}
-#log{max-height:170px;overflow:auto;font-size:.88rem;margin:0;padding-left:18px}
+#log{max-height:170px;overflow:auto;font-size:.88rem;margin:0;padding-left:3.4em}
+#log li{padding-left:.3em}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 button,select{font:inherit;padding:7px 12px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer}
 button:hover{background:var(--hz);color:#111}
@@ -61,6 +67,13 @@ button:hover{background:var(--hz);color:#111}
 </div>
 <details class="card hist"><summary>Move history</summary><ol id="log" reversed></ol></details>
 </main>
+<div id="promo" hidden>
+  <div class="dlg" role="dialog" aria-label="Choose promotion piece">
+    <div>Promote pawn to:</div>
+    <div class="row" id="promoopts"></div>
+    <button id="promocancel">Cancel</button>
+  </div>
+</div>
 <footer>Piece graphics by Cburnett via <a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>, licensed <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>.</footer>
 <script>
 /* ---------- SCP definitions: add your own here ---------- */
@@ -142,7 +155,7 @@ function pseudo(s,color){
 }
 function apply(s,m){
  const b=s.board.slice(),p=b[m.f],col=p[0],rights={...s.rights};
- b[m.t]=m.promo?col+'Q':p;b[m.f]='';
+ b[m.t]=m.promo?col+(m.pick||'Q'):p;b[m.f]='';
  if(m.ep)b[m.f+((m.t&7)-(m.f&7))]='';
  if(m.castle){const row=m.f>>3;
   if(m.castle==='K'){b[row*8+5]=b[row*8+7];b[row*8+7]=''}
@@ -229,16 +242,27 @@ function click(sq){
  if(G.over)return;
  const p=G.board[sq];
  const mv=hints.find(m=>m.t===sq);
- if(sel!==null&&mv)return play(mv);
+ if(sel!==null&&mv)return mv.promo?askPromo(mv):play(mv);
  if(p&&p!=='S'&&p[0]===G.turn){
   sel=sq;hints=legal(G,G.turn).filter(m=>m.f===sq);
  }else{sel=null;hints=[]}
  render();
 }
+function askPromo(m){
+ const col=G.turn,box=document.getElementById('promo'),opts=document.getElementById('promoopts');
+ opts.innerHTML='';
+ for(const t of 'QRBN'){
+  const b=document.createElement('button');b.title={Q:'Queen',R:'Rook',B:'Bishop',N:'Knight'}[t];
+  const im=document.createElement('img');im.src=pieceUrl(col+t);im.alt=b.title;im.referrerPolicy='no-referrer';
+  b.appendChild(im);b.onclick=()=>{box.hidden=true;play({...m,pick:t})};
+  opts.appendChild(b);
+ }
+ box.hidden=false;opts.firstChild.focus();
+}
 function play(m){
  const who=G.turn,p=G.board[m.f],cap=G.board[m.t];
  G=apply(G,m);sel=null;hints=[];lastScp=-1;
- logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'=Q':''}${m.castle?' (castles)':''}`);
+ logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`);
  if(who==='b'&&!finish()){
   const res=scpTurn(G);G=res.state;lastScp=res.moved;logs.push(res.log);
  }
@@ -283,7 +307,8 @@ function render(){
 }
 const fs=document.getElementById('force');
 for(const k in SCPS){const o=document.createElement('option');o.value=k;o.textContent=SCPS[k].name;fs.appendChild(o)}
-document.getElementById('new').onclick=newGame;
+document.getElementById('promocancel').onclick=()=>{document.getElementById('promo').hidden=true};
+document.getElementById('new').onclick=()=>{document.getElementById('promo').hidden=true;newGame()};
 newGame();
 </script>
 </body>
