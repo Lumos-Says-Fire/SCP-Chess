@@ -19,7 +19,7 @@ footer a{color:inherit}
 #promo .dlg{background:var(--panel);border-left:6px solid var(--hz);padding:16px;display:flex;flex-direction:column;gap:10px;align-items:center;font-weight:700}
 #promo .row button{width:72px;height:72px;padding:4px;background:var(--lt)}
 #promo img{width:100%;height:100%;display:block}
-/* ---------- main menu (layout from mockup, 1920px design grid) ---------- */
+/* ---------- main menu ---------- */
 body.on-menu{background:#171c1a;color:#fff}
 body.on-menu footer{border-color:#2b332f;opacity:1;color:#c9cfc6}
 #menu{--u:calc(min(100vw,1920px)/1920);--btn:#aab0a3;max-width:1920px;margin:0 auto;padding:calc(var(--u)*80) 0 calc(var(--u)*90);color:#fff;font-family:"Noto Sans","Segoe UI","Helvetica Neue",Arial,sans-serif;font-weight:700}
@@ -69,7 +69,7 @@ body.on-menu #toast{background:#e4e6df;color:#171c1a}
  #menu{--u:calc(100vw/900);padding-top:calc(var(--u)*50)}
  .mhead{flex-direction:column;gap:calc(var(--u)*40);padding:0 calc(var(--u)*50)}
  .login{margin-top:0;width:100%;max-width:calc(var(--u)*562)}
- .mgrid{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto;margin:calc(var(--u)*70) calc(var(--u)*50) 0}
+ .mgrid{grid-template-columns:minmax(0,1fr);grid-template-rows:none;grid-auto-rows:auto;margin:calc(var(--u)*70) calc(var(--u)*50) 0}
  .mgrid .pill{height:calc(var(--u)*140)}
  .scpbox,.timerbox{grid-column:1 !important;grid-row:auto !important}
  .scpbox{padding:calc(var(--u)*24) calc(var(--u)*40)}
@@ -85,6 +85,21 @@ body.on-menu #toast{background:#e4e6df;color:#171c1a}
  #scpblurb{font-size:calc(var(--u)*30)}
  .timerbox{min-height:calc(var(--u)*140)}
 }
+#aiDlg{width:min(94vw,calc(var(--u)*820));max-width:none;background:var(--btn);color:#fff;border:0;border-radius:calc(var(--u)*56);padding:calc(var(--u)*40);font-family:inherit;font-weight:700;-webkit-text-stroke:max(2.5px,calc(var(--u)*4.5)) #000;paint-order:stroke fill}
+#aiDlg::backdrop{background:rgba(0,0,0,.65)}
+#aiDlg h2{margin:0 0 calc(var(--u)*20);font-size:calc(var(--u)*50);text-align:center;line-height:1.1}
+.dlabel{font-size:calc(var(--u)*30);margin:calc(var(--u)*16) 0 calc(var(--u)*10)}
+.drow{display:flex;gap:calc(var(--u)*12)}
+#aiDlg .chip{height:calc(var(--u)*104)}
+#aiDlg .chip b{font-size:calc(var(--u)*40)}
+#aiDlg .chip small{font-size:calc(var(--u)*22)}
+.dbtn{flex:1;height:calc(var(--u)*88);font-size:calc(var(--u)*40);margin-top:calc(var(--u)*30)}
+.dbtn{background:rgba(23,28,26,.2)}
+.dbtn.go{background:#171c1a}
+.dbtn:hover{background:rgba(23,28,26,.32);color:#fff}
+.dbtn.go:hover{background:#2a332f;color:#fff}
+#clocks{display:flex;flex-direction:column}
+#clocks.flip #clkb{order:2}#clocks.flip #clkw{order:1}#clocks #tcl{order:3}
 details.hist{width:min(94vw,924px);margin:18px auto 0}
 details.card summary{cursor:pointer;font-weight:700}
 details.card[open] summary{margin-bottom:8px}
@@ -137,7 +152,7 @@ button:hover{background:var(--hz);color:#111}
       <div class="scpinfo"><div id="scpname"></div><div id="scpblurb"></div></div>
     </div>
     <button class="pill" id="goLocal" style="grid-column:1;grid-row:2">Local Multiplayer</button>
-    <button class="pill soon" style="grid-column:1;grid-row:3" data-msg="Singleplayer vs AI is coming soon.">Singleplayer VS AI</button>
+    <button class="pill" id="aiBtn" style="grid-column:1;grid-row:3">Singleplayer VS AI</button>
     <div class="box timerbox" role="radiogroup" aria-label="Time control">
       <button class="chip" role="radio" aria-checked="true" data-base="600" data-inc="0" data-label="10 minutes"><b>10</b><small>min</small></button>
       <button class="chip" role="radio" aria-checked="false" data-base="300" data-inc="0" data-label="5 minutes"><b>5</b><small>min</small></button>
@@ -146,6 +161,22 @@ button:hover{background:var(--hz);color:#111}
       <button class="chip" role="radio" aria-checked="false" data-base="60" data-inc="0" data-label="1 minute"><b>1</b><small>min</small></button>
     </div>
   </div>
+  <dialog id="aiDlg" aria-labelledby="aiTitle">
+    <h2 id="aiTitle">Singleplayer VS AI</h2>
+    <div class="dlabel" id="lvlLabel">Difficulty</div>
+    <div class="drow" role="radiogroup" aria-labelledby="lvlLabel">
+      <button class="chip" role="radio" aria-checked="false" data-g="lvl" data-v="easy"><b>Easy</b></button>
+      <button class="chip" role="radio" aria-checked="true" data-g="lvl" data-v="medium"><b>Medium</b></button>
+      <button class="chip" role="radio" aria-checked="false" data-g="lvl" data-v="hard"><b>Hard</b></button>
+    </div>
+    <div class="dlabel" id="sideLabel">You play as</div>
+    <div class="drow" role="radiogroup" aria-labelledby="sideLabel">
+      <button class="chip" role="radio" aria-checked="true" data-g="side" data-v="w"><b>White</b><small>moves first</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-g="side" data-v="b"><b>Black</b><small>moves second</small></button>
+      <button class="chip" role="radio" aria-checked="false" data-g="side" data-v="r"><b>Random</b><small>coin flip</small></button>
+    </div>
+    <div class="drow"><button class="pill dbtn go" id="aiStart">Start game</button><button class="pill dbtn" id="aiCancel">Cancel</button></div>
+  </dialog>
 </section>
 <div id="toast" role="status" aria-live="polite"></div>
 <main id="gameScreen" hidden>
@@ -419,7 +450,7 @@ function scpTurn(s){
 
 /* ---------- chess clock ---------- */
 // Clocks start after White's first move (that move is untimed, and earns no increment).
-let scpChoice='';
+let scpChoice='',mode={ai:null,level:'medium'},flip=false,aiTimer=0,aiScale=1;
 let timeCtl={base:600,inc:0,label:'10 minutes'};
 const clk={w:600,b:600,inc:0,running:false,last:0};
 const live=c=>clk[c]-(clk.running&&!G.over&&G.turn===c?(performance.now()-clk.last)/1000:0);
@@ -439,6 +470,9 @@ function drawClocks(){
 function resetClocks(){
  clk.w=clk.b=timeCtl.base;clk.inc=timeCtl.inc;clk.running=false;
  $('tcl').textContent='Time control: '+timeCtl.label+'. Clocks start after White\'s first move.';
+ const lbl=c=>(c==='w'?'White':'Black')+(mode.ai===c?` (AI, ${mode.level})`:mode.ai?' (you)':'');
+ $('clkw').querySelector('span').textContent=lbl('w');$('clkb').querySelector('span').textContent=lbl('b');
+ $('clocks').classList.toggle('flip',flip);
  drawClocks();
 }
 function timeout(c){
@@ -457,6 +491,7 @@ setInterval(()=>{
 /* ---------- game state ---------- */
 let G,sel=null,hints=[],logs=[],lastScp=-1;
 function newGame(){
+ clearTimeout(aiTimer);
  const back='RNBQKBNR',b=Array(64).fill('');
  for(let i=0;i<8;i++){b[i]='b'+back[i];b[8+i]='bP';b[48+i]='wP';b[56+i]='w'+back[i]}
  const forced=scpChoice;
@@ -469,9 +504,10 @@ function newGame(){
  sel=null;hints=[];lastScp=-1;
  logs=[`${SCPS[id].name} has breached containment at ${nm(sq)}.`];
  render();
+ if(mode.ai&&G.turn===mode.ai)scheduleAI();
 }
 function click(sq){
- if(G.over)return;
+ if(G.over||(mode.ai&&G.turn===mode.ai))return;
  const p=G.board[sq];
  const mv=hints.find(m=>m.t===sq);
  if(sel!==null&&mv)return mv.promo?askPromo(mv):play(mv);
@@ -505,6 +541,7 @@ function play(m){
  G.clock=(p[1]==='P'||sig(G)!==sig0)?0:G.clock+1;
  finish(true);
  render();
+ if(!G.over&&mode.ai&&G.turn===mode.ai)scheduleAI();
 }
 /* ---------- draw rules ---------- */
 // Pieces on the board with candy marks, used to spot irreversible changes (captures, conversions, returns).
@@ -527,16 +564,117 @@ function finish(full){
   if(G.clock>=100)return end('Draw by the 50-move rule.');
   if(dead(G))return end('Draw: only the kings remain, so checkmate is impossible.');
  }
- G.msg=`${t==='w'?'White':'Black'} to move${chk?' (in check)':''}`;
+ G.msg=`${t==='w'?'White':'Black'}${mode.ai===t?' (AI)':''} to move${chk?' (in check)':''}`;
  return false;
+}
+
+/* ---------- AI ---------- */
+// Plain alpha-beta search. It treats the SCP as a fixed obstacle (SCP-330's marking/removal is simulated;
+// SCP-914 is handled by a rough root heuristic), so it does not predict the SCP's own moves.
+const PV={P:100,N:320,B:330,R:500,Q:900,K:0},MATE=100000;
+let deadline=0,aborted=false,allowAbort=false,nodes=0;
+const AI_LEVELS={
+ easy:{depth:1,ms:150,noise:220,rand:.18},
+ medium:{depth:2,ms:450,noise:30,rand:0},
+ hard:{depth:6,ms:1100,noise:0,rand:0}
+};
+function evaluate(s,color){
+ let sc=0,heavy=0;const b=s.board;
+ for(let i=0;i<64;i++){const p=b[i];if(p&&(p[1]==='Q'||p[1]==='R')&&p[0]!=='g')heavy++}
+ for(let i=0;i<64;i++){
+  const p=b[i];if(!p||p==='S'||p[0]==='g')continue;
+  const t=p[1],r=i>>3,c=i&7,cen=3.5-Math.max(Math.abs(r-3.5),Math.abs(c-3.5));
+  let v=PV[t];
+  if(t==='P')v+=(p[0]==='w'?6-r:r-1)*8;
+  else if(t==='N'||t==='B')v+=cen*12;
+  else if(t==='Q')v+=cen*3;
+  else if(t==='K'&&heavy>=3)v-=Math.abs(r-(p[0]==='w'?7:0))*10;
+  sc+=p[0]==='w'?v:-v;
+ }
+ return color==='w'?sc:-sc;
+}
+function orderMoves(s,ms){
+ for(const m of ms){
+  const v=s.board[m.t],a=PV[s.board[m.f][1]];
+  m.o=(v?(v[0]==='g'?0:10*PV[v[1]]-a/10):m.ep?900:0)+(m.promo?800:0);
+ }
+ ms.sort((x,y)=>y.o-x.o);
+}
+function quiesce(s,alpha,beta,color,qd,ms){
+ const stand=evaluate(s,color);
+ if(stand>=beta)return beta;
+ if(stand>alpha)alpha=stand;
+ if(qd<=0)return alpha;
+ const caps=ms.filter(m=>(s.board[m.t]&&s.board[m.t][0]!=='g')||m.ep);
+ orderMoves(s,caps);
+ for(const m of caps){
+  const ns=apply(s,m,false),o=other(color);
+  const v=-quiesce(ns,-beta,-alpha,o,qd-1,legal(ns,o));
+  if(v>=beta)return beta;
+  if(v>alpha)alpha=v;
+ }
+ return alpha;
+}
+function search(s,depth,alpha,beta,color,ply){
+ if(allowAbort&&(++nodes&127)===0&&performance.now()>deadline)aborted=true;
+ if(aborted)return 0;
+ const ms=legal(s,color);
+ if(!ms.length)return inCheck(s,color)?-MATE+ply:0;
+ if(depth<=0)return quiesce(s,alpha,beta,color,3,ms);
+ orderMoves(s,ms);
+ for(const m of ms){
+  const v=-search(apply(s,m,false),depth-1,-beta,-alpha,other(color),ply+1);
+  if(aborted)return 0;
+  if(v>=beta)return beta;
+  if(v>alpha)alpha=v;
+ }
+ return alpha;
+}
+function rootAdjust(m,level){
+ // SCP-914 re-rolls any piece landing beside it: on average a piece is worth ~358.
+ if(level==='easy'||G.scp.id!=='914')return 0;
+ const p=G.board[m.f];
+ return p[1]!=='K'&&dist(m.t,G.scp.sq)===1?358-PV[p[1]]:0;
+}
+function chooseMove(level){
+ const cfg=AI_LEVELS[level]||AI_LEVELS.medium,color=G.turn,root=legal(G,color);
+ if(!root.length)return null;
+ if(root.length===1||Math.random()<cfg.rand)return pick(root);
+ aborted=false;allowAbort=false;nodes=0;deadline=performance.now()+cfg.ms*aiScale;
+ orderMoves(G,root);
+ let best=root[0];
+ for(let d=1;d<=cfg.depth;d++){
+  const res=[];let alpha=-Infinity;
+  for(const m of root){
+   const ns=apply(G,m,false);
+   const v=-search(ns,d-1,-Infinity,cfg.noise?Infinity:-alpha,other(color),1)+rootAdjust(m,level);
+   if(aborted)break;
+   res.push([m,v]);if(v>alpha)alpha=v;
+  }
+  if(aborted||res.length<root.length)break;
+  let top=-Infinity;
+  for(const r of res){r[2]=r[1]+(cfg.noise?(Math.random()*2-1)*cfg.noise:0);if(r[2]>top){top=r[2];best=r[0]}}
+  if(top>MATE/2)break;
+  root.splice(root.indexOf(best),1);root.unshift(best);
+  allowAbort=true;
+ }
+ return best;
+}
+function scheduleAI(){clearTimeout(aiTimer);aiTimer=setTimeout(aiMove,450)}
+function aiMove(){
+ if(G.over||!mode.ai||G.turn!==mode.ai||$('gameScreen').hidden)return;
+ const m=chooseMove(mode.level);
+ if(!m)return;
+ if(m.promo)m.pick='Q';
+ play(m);
 }
 
 /* ---------- rendering ---------- */
 function render(){
  const el=document.getElementById('board');el.innerHTML='';
  const chkSq=!G.over||G.msg.startsWith('Checkmate')?(inCheck(G,G.turn)?kingSq(G.board,G.turn):-1):-1;
- for(let i=0;i<64;i++){
-  const p=G.board[i],d=document.createElement('div');
+ for(let n=0;n<64;n++){
+  const i=flip?63-n:n,p=G.board[i],d=document.createElement('div');
   d.className='sq '+(((i>>3)+(i&7))%2?'d':'l');
   if(i===sel)d.classList.add('sel');
   if(i===chkSq)d.classList.add('chk');
@@ -573,8 +711,19 @@ function show(name){
  window.scrollTo(0,0);
  if(m)updArrows();
 }
-$('goLocal').onclick=()=>{newGame();show('game')};
-$('backBtn').onclick=()=>show('menu');
+$('goLocal').onclick=()=>{mode={ai:null,level:mode.level};flip=false;newGame();show('game')};
+$('backBtn').onclick=()=>{clearTimeout(aiTimer);show('menu')};
+$('aiBtn').onclick=()=>$('aiDlg').showModal();
+$('aiCancel').onclick=()=>$('aiDlg').close();
+document.querySelectorAll('#aiDlg .chip').forEach(ch=>ch.onclick=()=>{
+ document.querySelectorAll(`#aiDlg .chip[data-g="${ch.dataset.g}"]`).forEach(x=>x.setAttribute('aria-checked',String(x===ch)));
+});
+$('aiStart').onclick=()=>{
+ const sel=g=>document.querySelector(`#aiDlg .chip[data-g="${g}"][aria-checked="true"]`).dataset.v;
+ let side=sel('side');if(side==='r')side=Math.random()<.5?'w':'b';
+ mode={ai:other(side),level:sel('lvl')};flip=side==='b';
+ $('aiDlg').close();newGame();show('game');
+};
 let toastTimer;
 document.querySelectorAll('.soon').forEach(b=>b.onclick=()=>{
  const t=$('toast');t.textContent=b.dataset.msg;t.classList.add('on');
