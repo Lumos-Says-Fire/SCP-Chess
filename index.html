@@ -117,6 +117,8 @@ h1{font:700 1.7rem/1.1 "Franklin Gothic Medium","Arial Narrow",sans-serif;margin
 .badge{position:absolute;right:3%;bottom:2%;font-size:min(3.6vw,19px);line-height:1;pointer-events:none}
 .badge.dir{right:auto;left:5%;font-size:min(3vw,15px);color:#222}
 .scp{width:84%;height:84%;background:var(--hz);color:#111;border:3px solid #111;border-radius:4px;display:flex;align-items:center;justify-content:center;font:700 min(3.4vw,17px)/1 "Arial Narrow",sans-serif;background-image:repeating-linear-gradient(135deg,transparent 0 7px,rgba(0,0,0,.12) 7px 14px)}
+.sq.tgt{box-shadow:inset 0 0 0 4px var(--red)}
+.scp.rage{background-color:var(--red);color:#fff}
 .scp.moved{outline:3px solid var(--red)}
 aside{width:min(94vw,340px);display:flex;flex-direction:column;gap:12px}
 .card{background:var(--panel);border-left:6px solid var(--hz);padding:12px 14px}
@@ -214,6 +216,7 @@ button:hover{background:var(--hz);color:#111}
 const $=id=>document.getElementById(id);
 /* ---------- SCP definitions ---------- */
 const SCPS={
+ '096':{name:'SCP-096',title:'The Shy Guy',blurb:'Wanders calmly until attacked, then hunts its attackers.',desc:'Moves like a king, wandering at random. Once a piece (not a king) attacks it, it moves like a queen until every attacker has been captured. It only captures pieces that have attacked it, in the order they attacked.'},
  '018':{name:'SCP-018',title:'Super Ball',blurb:'Bounces diagonally across the board.',desc:'Moves like a bishop, always as far as it can go. Its first move is in a random direction; after that it bounces. Off a side wall it reverses horizontally, off the top or bottom wall (or after capturing a piece) it reverses vertically, and off a corner or a king it reverses both. It captures any non-king piece it runs into.'},
  '173':{name:'SCP-173',title:'The Sculpture',blurb:'Strikes like a rook, but freezes when attacked.',desc:'Moves like a rook. Captures a piece whenever it can (never a king), otherwise moves to a random square in reach. It cannot move while any piece is attacking it.'},
  '049':{name:'SCP-049',title:'Plague Doctor',blurb:'Turns nearby pieces grey and takes them over.',desc:'Moves one square at a time toward the nearest piece. Each turn, one randomly chosen piece next to it (never a king) turns grey and becomes its own. It can convert the same color at most three times in a row, and only heads toward colors it can currently convert; grey pieces can be captured by either player. Before 049 moves, one grey piece acts: it captures if it can, otherwise it runs as far as it can in a random direction.'},
@@ -249,6 +252,20 @@ function attacked(b,sq,by){
   while(inb(y,x)){const p=b[y*8+x];if(p){if(p[0]===by&&(p[1]===t||p[1]==='Q'))return true;break}y+=d;x+=e}
  }
  return false;
+}
+// Squares of non-king pieces (either color) that attack sq.
+function attackersOf(b,sq){
+ const out=[],r=sq>>3,c=sq&7;
+ for(const by of 'wb'){
+  const pr=by==='w'?r+1:r-1;
+  for(const dc of[-1,1])if(inb(pr,c+dc)&&b[pr*8+c+dc]===by+'P')out.push(pr*8+c+dc);
+  for(const[d,e]of N)if(inb(r+d,c+e)&&b[(r+d)*8+c+e]===by+'N')out.push((r+d)*8+c+e);
+  for(const[ds,t]of[[ORTH,'R'],[DIAG,'B']])for(const[d,e]of ds){
+   let y=r+d,x=c+e;
+   while(inb(y,x)){const p=b[y*8+x];if(p){if(p[0]===by&&(p[1]===t||p[1]==='Q'))out.push(y*8+x);break}y+=d;x+=e}
+  }
+ }
+ return out;
 }
 function pseudo(s,color){
  const b=s.board,out=[],opp=other(color);
@@ -319,8 +336,18 @@ function apply(s,m,real){
    else{b[m.t]='';note=`SCP-914 removes the ${here} on ${at}.`}
   }
  }
+ let scp=s.scp;
+ if(real&&sid==='096'){
+  const live=q=>b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K',epq=m.f+((m.t&7)-(m.f&7));
+  let tg=(s.scp.targets||[]).filter(q=>q!==m.t&&!(m.ep&&q===epq)).map(q=>q===m.f?m.t:q);
+  if(m.castle){const row=m.f>>3,[a,z]=m.castle==='K'?[7,5]:[0,3];tg=tg.map(q=>q===row*8+a?row*8+z:q)}
+  tg=tg.filter(live);
+  const att=attackersOf(b,s.scp.sq).filter(q=>!tg.includes(q)).sort((x,y)=>(y===m.t)-(x===m.t)||x-y);
+  for(const q of att){tg.push(q);note+=`SCP-096 is attacked by the ${pdesc(b[q])} on ${nm(q)}. `}
+  scp={...s.scp,targets:tg};
+ }
  for(let i=0;i<64;i++)if(!b[i])marks[i]=0;
- return{...s,board:b,rights,marks,note,ep:m.dp&&b[m.t]&&b[m.t][1]==='P'?(m.f+m.t)/2:-1,turn:other(col)};
+ return{...s,board:b,rights,marks,note:note.trim(),scp,ep:m.dp&&b[m.t]&&b[m.t][1]==='P'?(m.f+m.t)/2:-1,turn:other(col)};
 }
 const kingSq=(b,c)=>b.indexOf(c+'K');
 const inCheck=(s,c)=>attacked(s.board,kingSq(s.board,c),other(c));
@@ -403,6 +430,22 @@ function scpTurn(s){
   }
  }else if(id==='999'){
   o=reach(K,1,false);ch=o.length?pick(o):null;
+ }else if(id==='096'){
+  const live=q=>b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K';
+  const tg=(sc.targets||[]).filter(live);
+  if(tg.length){
+   const T=tg[0];o=reach(K,8,true);
+   const hit=o.find(x=>x.cap&&x.t===T);
+   if(hit)ch=hit;
+   else{
+    const mv=o.filter(x=>!x.cap);
+    if(mv.length){
+     const line=(a,t)=>{const dr=(t>>3)-(a>>3),dc=(t&7)-(a&7);if(dr&&dc&&Math.abs(dr)!==Math.abs(dc))return false;const sr=Math.sign(dr),sk=Math.sign(dc);let y=(a>>3)+sr,x=(a&7)+sk;while(y!==(t>>3)||x!==(t&7)){const q=y*8+x;if(b[q]&&q!==from)return false;y+=sr;x+=sk}return true};
+     const dd=x=>dist(x.t,T),los=mv.filter(x=>line(x.t,T)),pool=los.length?los:mv,mn=Math.min(...pool.map(dd));
+     ch=pick(pool.filter(x=>dd(x)===mn));
+    }
+   }
+  }else{o=reach(K,1,false);ch=o.length?pick(o):null}
  }else if(id==='018'){
   // First step must be on the board and either empty or a capturable piece.
   const okFirst=(y,x)=>{if(!inb(y,x))return false;const p=b[y*8+x];return !p||(p!=='S'&&p[1]!=='K')};
@@ -440,6 +483,13 @@ function scpTurn(s){
    if(inb(y,x)&&b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K'&&b[q][0]!==blocked)cand.push(q);
   }
   if(cand.length){const q=pick(cand);const col=b[q][0];st.n=st.c===col?st.n+1:1;st.c=col;parts.push(`The ${pdesc(b[q])} on ${nm(q)} turns grey.`);b[q]='g'+b[q][1]+b[q][0]}
+ }
+ if(id==='096'){
+  const live=q=>b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K';
+  const tg=(sc.targets||[]).filter(live);
+  const att=attackersOf(b,sc.sq).filter(q=>!tg.includes(q)).sort((x,y)=>x-y);
+  for(const q of att){tg.push(q);parts.push(`SCP-096 is attacked by the ${pdesc(b[q])} on ${nm(q)}.`)}
+  sc.targets=tg;
  }
  const rights={...s.rights},marks=s.marks.slice();
  if(b[63]!=='wR')rights.wK=false;if(b[56]!=='wR')rights.wQ=false;
@@ -498,7 +548,7 @@ function newGame(){
  const id=forced||pick(Object.keys(SCPS));
  const sq=id==='330'||id==='914'?pick([27,28,35,36]):(3+(Math.random()*2|0))*8+(Math.random()<.5?0:7); // 330: center; others: ranks 4-5, a/h files
  b[sq]='S';
- G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0},dir:null},over:false,msg:''};
+ G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0},dir:null,targets:[]},over:false,msg:''};
  G.hist[posKey(G)]=1;
  resetClocks();
  sel=null;hints=[];lastScp=-1;
@@ -548,7 +598,7 @@ function play(m){
 const sig=s=>s.board.map((p,i)=>p&&p!=='S'?p+(s.marks[i]?'*':''):'').filter(Boolean).sort().join(',');
 function posKey(s){
  const ep=s.ep>=0&&pseudo(s,s.turn).some(m=>m.ep)?s.ep:-1,sc=s.scp;
- return s.board.map((p,i)=>p+(s.marks[i]?'*':'')).join(',')+'|'+s.turn+Object.values(s.rights).map(Number).join('')+ep+'|'+(sc.held||[]).slice().sort().join('')+(sc.streak?sc.streak.c+sc.streak.n:'')+(sc.dir?sc.dir.join(','):'');
+ return s.board.map((p,i)=>p+(s.marks[i]?'*':'')).join(',')+'|'+s.turn+Object.values(s.rights).map(Number).join('')+ep+'|'+(sc.held||[]).slice().sort().join('')+(sc.streak?sc.streak.c+sc.streak.n:'')+(sc.dir?sc.dir.join(','):'')+(sc.targets||[]).join(',');
 }
 // Only bare kings are a dead position: the SCP can act as a blocker and 330 can upgrade pieces,
 // so king + minor piece can still mate. 106 can also bring captured pieces back.
@@ -677,10 +727,11 @@ function render(){
   const i=flip?63-n:n,p=G.board[i],d=document.createElement('div');
   d.className='sq '+(((i>>3)+(i&7))%2?'d':'l');
   if(i===sel)d.classList.add('sel');
+  if((G.scp.targets||[]).includes(i))d.classList.add('tgt');
   if(i===chkSq)d.classList.add('chk');
   const h=hints.find(m=>m.t===i);
   if(h)d.classList.add(p||h.ep?'cp':'mv');
-  if(p==='S'){d.innerHTML=`<div class="scp${i===lastScp?' moved':''}" title="${SCPS[G.scp.id].name}">${G.scp.id}</div>`}
+  if(p==='S'){d.innerHTML=`<div class="scp${i===lastScp?' moved':''}${(G.scp.targets||[]).length?' rage':''}" title="${SCPS[G.scp.id].name}">${G.scp.id}</div>`}
   else if(p){
    const grey=p[0]==='g',im=document.createElement('img');
    im.src=pieceUrl(grey?'b'+p[1]:p);im.alt=pdesc(p);im.draggable=false;im.referrerPolicy='no-referrer';
@@ -697,7 +748,9 @@ function render(){
  const st=document.getElementById('status');
  st.textContent=G.msg||'White to move';st.className=G.over?'end':'';
  const s=SCPS[G.scp.id];
- document.getElementById('scpcard').innerHTML=`<h2>${s.name}</h2><div>${s.title}</div><p>${s.desc}</p>`;
+ const tgs=G.scp.targets||[];
+ const status=G.scp.id==='096'?`<p><b>${tgs.length?'Enraged. Hunting, in order: '+tgs.map(q=>pdesc(G.board[q])+' on '+nm(q)).join(', '):'Calm.'}</b></p>`:'';
+ document.getElementById('scpcard').innerHTML=`<h2>${s.name}</h2><div>${s.title}</div><p>${s.desc}</p>${status}`;
  const lg=document.getElementById('log');
  lg.innerHTML=logs.slice().reverse().map(x=>`<li>${x}</li>`).join('');
 }
