@@ -1,0 +1,35 @@
+name: Keep Supabase awake
+
+# Free Supabase projects pause after a week of low activity. This sends a couple of
+# real database requests twice a day so the project stays active.
+
+on:
+  schedule:
+    - cron: '17 6,18 * * *'   # 06:17 and 18:17 UTC every day
+  workflow_dispatch:           # lets you run it by hand from the Actions tab
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query the database
+        env:
+          SUPABASE_URL: https://dkjchgxmrqcougskdbye.supabase.co
+          SUPABASE_KEY: sb_publishable_-iYLqL_b_TOGLmq483WaIA_6d64dm5G
+        run: |
+          set -euo pipefail
+          curl_opts=(--fail-with-body --silent --show-error --max-time 30 --retry 3 --retry-delay 10 --retry-all-errors)
+
+          echo "Reading one profile row..."
+          curl "${curl_opts[@]}" -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1"
+          echo
+
+          echo "Asking the database for the time..."
+          curl "${curl_opts[@]}" -X POST -H "apikey: $SUPABASE_KEY" \
+            -H "Content-Type: application/json" -d '{}' \
+            "$SUPABASE_URL/rest/v1/rpc/server_time"
+          echo
