@@ -65,6 +65,8 @@ body.on-menu footer{border-color:#2b332f;opacity:1;color:#c9cfc6}
 .clk.on{border-left-color:var(--hz);background:var(--lt)}
 .clk.low b{color:var(--red)}
 #tcl{font-size:.8rem;opacity:.75;margin-top:6px}
+#drawMsg{font-size:.9rem;min-height:2.4em;line-height:1.2;margin-bottom:8px}
+#drawCard button:disabled{opacity:.45;cursor:default}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 16px;border-left:6px solid var(--hz);font:600 .95rem system-ui,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
 body.on-menu #toast{background:#e4e6df;color:#171c1a}
@@ -258,6 +260,10 @@ button:hover{background:var(--hz);color:#111}
     <div class="clk" id="clkb"><span>Black</span><b>0:00</b></div>
     <div class="clk" id="clkw"><span>White</span><b>0:00</b></div>
     <div id="tcl"></div>
+  </div>
+  <div class="card" id="drawCard" hidden>
+    <div id="drawMsg"></div>
+    <div class="row"><button id="drawA" type="button"></button><button id="drawB" type="button" hidden></button></div>
   </div>
   <div class="card"><div id="status"></div></div>
   <div class="card" id="scpcard"></div>
@@ -868,6 +874,7 @@ function render(){
  document.getElementById('scpcard').innerHTML=`<h2>${s.name}</h2><div>${s.title}</div><p>${s.desc}</p>${status}`;
  const lg=document.getElementById('log');
  lg.innerHTML=logs.slice().reverse().map(x=>`<li>${x}</li>`).join('');
+ drawUI();
 }
 document.getElementById('promocancel').onclick=()=>{document.getElementById('promo').hidden=true};
 document.getElementById('new').onclick=()=>{document.getElementById('promo').hidden=true;newGame()};
@@ -1018,7 +1025,7 @@ async function startOnline(g){
   leaveOnline();
   const tl=g.base%60===0?`${g.base/60} min`:`${g.base}s`;
   timeCtl={base:g.base,inc:g.inc,label:tl+(g.inc?` + ${g.inc}s`:'')};
-  mode={ai:null,level:mode.level,online:{gid:g.id,color,names,startedAt:g.started_at?Date.parse(g.started_at):Date.now()+srvOff}};
+  mode={ai:null,level:mode.level,online:{gid:g.id,color,names,draw:g.draw_offer||null,startedAt:g.started_at?Date.parse(g.started_at):Date.now()+srvOff}};
   flip=color==='b';rng=mulberry32(g.seed);onlinePly=0;onlineBusy=false;posted=false;
   newGame({scp:g.scp});
   $('new').hidden=true;$('resignBtn').hidden=false;
@@ -1038,7 +1045,7 @@ function leaveOnline(){
  if(onlineChan&&sb){sb.removeChannel(onlineChan)}
  onlineChan=null;
  if(mode.online){mode={ai:null,level:mode.level};flip=false}
- rng=Math.random;$('new').hidden=false;$('resignBtn').hidden=true;
+ rng=Math.random;$('new').hidden=false;$('resignBtn').hidden=true;drawUI();
 }
 async function resync(){
  if(!mode.online||resyncing)return;resyncing=true;
@@ -1063,14 +1070,52 @@ async function sendMove(m){
  const r=await sb.from('moves').insert({game_id:mode.online.gid,ply:onlinePly,from_sq:m.f,to_sq:m.t,promo:m.promo?(m.pick||'Q'):null}).select().single();
  onlineBusy=false;
  if(r.error||!r.data){toast('Your move was not accepted: '+(r.error?r.error.message:'unknown error'));resync();render();return}
- onlinePly++;play(m,{at:Date.parse(r.data.made_at)});
+ onlinePly++;
+ if(mode.online.draw&&mode.online.draw!==mode.online.color){mode.online.draw=null}   // moving declines the opponent's offer
+ play(m,{at:Date.parse(r.data.made_at)});
 }
-function onGameUpdate(row){
- if(!mode.online||G.over||row.status!=='finished')return;
- G.over=true;G.result=row.result;sel=null;hints=[];$('promo').hidden=true;
- G.msg=row.result==='d'?'The game ended in a draw.':row.result===mode.online.color?'Your opponent left the game. You win.':'You lost the game.';
- logs.push(G.msg);render();
+function onGameUpdate(row,own){
+ if(!mode.online||(row.id&&row.id!==mode.online.gid))return;
+ const me=mode.online.color,opp=mode.online.names[other(me)],prev=mode.online.draw;
+ if(!own&&row.status!=='finished'&&(row.draw_offer||null)===prev)return;   // nothing new (the 3-second poll lands here)
+ mode.online.draw=row.status==='finished'?null:(row.draw_offer||null);
+ if(G.over){drawUI();return}
+ if(row.status==='finished'){
+  G.over=true;G.result=row.result;sel=null;hints=[];$('promo').hidden=true;
+  G.msg=row.result==='d'?'Draw agreed.':row.result===me?'Your opponent left the game. You win.':'You lost the game.';
+  logs.push(G.msg);render();return;
+ }
+ if(!own){
+  if(!prev&&mode.online.draw&&mode.online.draw!==me)logs.push(`${opp} offers a draw.`);
+  else if(prev===me&&!mode.online.draw)logs.push('Your draw offer was declined.');
+  else if(prev&&prev!==me&&!mode.online.draw)logs.push('The draw offer was withdrawn.');
+ }
+ render();
 }
+function drawUI(){
+ const card=$('drawCard');
+ if(!mode.online){card.hidden=true;return}
+ card.hidden=false;
+ const d=mode.online.draw,me=mode.online.color,opp=mode.online.names[other(me)],A=$('drawA'),B=$('drawB');
+ $('drawMsg').textContent=d?(d===me?'You offered a draw. Waiting for a reply.':`${opp} offers a draw.`):'Offer a draw to your opponent.';
+ if(d&&d!==me){A.textContent='Accept draw';B.textContent='Decline';B.hidden=false}
+ else{A.textContent=d===me?'Withdraw offer':'Offer draw';B.hidden=true}
+ A.disabled=B.disabled=!!G.over||(!d&&onlinePly<1);
+}
+async function drawAction(a){
+ if(!mode.online||G.over||!sb)return;
+ const r=await sb.rpc('draw_action',{p_game:mode.online.gid,p_action:a});
+ if(r.error){
+  const m=r.error.message||'';
+  toast(/draw_action/.test(m)?'Draw offers need the latest database setup.':/make a move/.test(m)?'Make a move before offering a draw again.':/no active game/.test(m)?'The game is already over.':'Draw offer failed: '+m);
+  return;
+ }
+ const note={offer:'You offered a draw.',withdraw:'You withdrew your draw offer.',decline:'You declined the draw offer.',accept:''}[a];
+ if(note)logs.push(note);
+ onGameUpdate(r.data,true);
+}
+$('drawA').onclick=()=>{const d=mode.online&&mode.online.draw;if(!mode.online)return;drawAction(!d?'offer':d===mode.online.color?'withdraw':'accept')};
+$('drawB').onclick=()=>drawAction('decline');
 async function postResult(){
  if(!mode.online||posted||!G.over||!sb)return;posted=true;
  try{await sb.from('games').update({status:'finished',result:G.result||'d'}).eq('id',mode.online.gid).eq('status','active')}catch(e){}
@@ -1082,6 +1127,7 @@ $('resignBtn').onclick=()=>{
 setInterval(()=>{
  if(!sb)return;
  if(mode.online&&!G.over&&!onlineBusy&&G.turn!==mode.online.color)resync();
+ if(mode.online&&!G.over)sb.from('games').select('*').eq('id',mode.online.gid).maybeSingle().then(r=>{if(r.data)onGameUpdate(r.data)}).catch(()=>{});
  if(waitGame)sb.from('games').select('*').eq('id',waitGame.id).maybeSingle().then(r=>{if(waitGame&&r.data&&r.data.status==='active')matched(r.data)}).catch(()=>{});
 },3000);
 
