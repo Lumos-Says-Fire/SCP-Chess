@@ -42,13 +42,15 @@ body.on-menu footer{border-color:#2b332f;opacity:1;color:#c9cfc6}
 .scpgrid .chip{flex:0 0 calc((100% - (var(--vis) - 1)*var(--gap))/var(--vis));scroll-snap-align:start;height:calc(var(--u)*96);border-radius:calc(var(--u)*28)}
 .scpgrid .chip b{font-size:calc(var(--u)*34)}
 .scpgrid .chip small{font-size:calc(var(--u)*20)}
+.scpgrid .chip.long b{font-size:calc(var(--u)*29)}
 .arrow{flex:none;width:max(34px,calc(var(--u)*54));height:calc(var(--u)*96);padding:0;border:0;border-radius:calc(var(--u)*28);background:rgba(23,28,26,.14);color:#fff;font:inherit;font-size:calc(var(--u)*60);line-height:1;cursor:pointer}
 .arrow:hover:not(:disabled){background:rgba(23,28,26,.28);color:#fff}
 .arrow:disabled{opacity:.3;cursor:default}
 .arrow:focus-visible{outline:3px solid var(--hz);outline-offset:2px}
-.scpinfo{line-height:1.2;min-height:calc(var(--u)*128)} /* reserves room for a name plus three lines, so the carousel never shifts */
+.scpinfo{line-height:1.2;width:100%;min-width:0} /* name, nickname and description each reserve their space, so the carousel never shifts */
+#scpname{min-height:1.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 #scpname{font-size:calc(var(--u)*32)}
-#scpblurb{font-size:calc(var(--u)*24);margin-top:calc(var(--u)*4)}
+#scpblurb{font-size:calc(var(--u)*24);margin-top:calc(var(--u)*6);min-height:2.4em;text-wrap:balance}
 .timerbox{grid-column:2;grid-row:3;gap:calc(var(--u)*10);padding:0 calc(var(--u)*22)}
 .chip{flex:1;min-width:0;height:calc(var(--u)*100);display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(23,28,26,.14);color:#fff;border:calc(var(--u)*4) solid transparent;border-radius:calc(var(--u)*34);font:inherit;cursor:pointer;padding:0}
 .chip b{font-size:calc(var(--u)*38);line-height:1.3;white-space:nowrap}
@@ -81,7 +83,6 @@ body.on-menu #toast{background:#e4e6df;color:#171c1a}
  .scpgrid .chip b{font-size:calc(var(--u)*48)}
  .scpgrid .chip small{font-size:calc(var(--u)*26)}
  .arrow{height:calc(var(--u)*110);font-size:calc(var(--u)*70)}
- .scpinfo{min-height:calc(var(--u)*160)}
  #scpname{font-size:calc(var(--u)*40)}
  #scpblurb{font-size:calc(var(--u)*30)}
  .timerbox{min-height:calc(var(--u)*140)}
@@ -106,6 +107,7 @@ body.on-menu #toast{background:#e4e6df;color:#171c1a}
  .pill,.box,.chip,.chip b,.chip small,.arrow,.menudlg,.menudlg h2,.dlabel,.dmsg,.derr,#scpname,#scpblurb{-webkit-text-stroke:max(1px,.06em) #000;paint-order:stroke fill}
  .menudlg input{-webkit-text-stroke:0;font-size:max(16px,calc(var(--u)*32))}
  .scpgrid .chip b{font-size:max(19px,calc(var(--u)*48))}
+ .scpgrid .chip.long b{font-size:max(17px,calc(var(--u)*40))}
  .scpgrid .chip small,.menudlg .chip small,.timerbox .chip small{font-size:max(12px,calc(var(--u)*26))}
  .timerbox .chip b{font-size:max(19px,calc(var(--u)*46))}
  .timerbox .chip{height:max(calc(var(--u)*100),42px)}
@@ -175,7 +177,7 @@ button:hover{background:var(--hz);color:#111}
         <div class="scpgrid" id="scpgrid"></div>
         <button class="arrow" id="scpNext" aria-label="Next SCPs">›</button>
       </div>
-      <div class="scpinfo"><div id="scpname"></div><div id="scpblurb"></div></div>
+      <div class="scpinfo"><div id="scpname"><span id="scpfit"></span></div><div id="scpblurb"></div></div>
     </div>
     <button class="pill" id="goLocal" style="grid-column:1;grid-row:2">Local Multiplayer</button>
     <button class="pill" id="aiBtn" style="grid-column:1;grid-row:3">Singleplayer VS AI</button>
@@ -281,6 +283,7 @@ button:hover{background:var(--hz);color:#111}
 const $=id=>document.getElementById(id);
 /* ---------- SCP definitions ---------- */
 const SCPS={
+ '1156':{name:'SCP-1156',title:'Wellington G. Wonderhorse',blurb:'A coach horse who gives nearby pieces a lift.',desc:'Moves like a knight, wandering at random, and never captures or moves kings. Whenever it moves, it carries one adjacent piece along and sets it down in the same position relative to itself, or in the nearest free spot beside it. It never moves to a square with no free space beside it.'},
  '096':{name:'SCP-096',title:'The Shy Guy',blurb:'Wanders calmly until attacked, then hunts its attackers.',desc:'Moves like a king, wandering at random. Once a piece (not a king) attacks it, it moves like a queen until every attacker has been captured. It only captures pieces that have attacked it, in the order they attacked.'},
  '018':{name:'SCP-018',title:'Super Ball',blurb:'Bounces diagonally across the board.',desc:'Moves like a bishop, always as far as it can go. Its first move is in a random direction; after that it bounces. Off a side wall it reverses horizontally, off the top or bottom wall (or after capturing a piece) it reverses vertically, and off a corner or a king it reverses both. It captures any non-king piece it runs into.'},
  '173':{name:'SCP-173',title:'The Sculpture',blurb:'Strikes like a rook, but freezes when attacked.',desc:'Moves like a rook. Captures a piece whenever it can (never a king), otherwise moves to a random square in reach. It cannot move while any piece is attacking it.'},
@@ -462,7 +465,7 @@ function scpTurn(s){
   return o;
  };
  const best=(o,L)=>{const m=Math.min(...o.map(x=>near(x.t,L)));return pick(o.filter(x=>near(x.t,L)===m))};
- let o,ch=null;
+ let o,ch=null,carry=null;
  if(id==='173'){
   if(attacked(b,from,'w')||attacked(b,from,'b'))parts.push(`${me} is under attack and cannot move.`);
   else{o=reach(ORTH,8,true);const caps=o.filter(x=>x.cap);ch=caps.length?pick(caps):o.length?pick(o):null}
@@ -498,6 +501,30 @@ function scpTurn(s){
   }
  }else if(id==='999'){
   o=reach(K,1,false);ch=o.length?pick(o):null;
+ }else if(id==='1156'){
+  // Knight moves to empty squares only. Carrying is incidental: a destination is chosen at random, then a passenger.
+  const ring=(y,x)=>K.map(([d,e])=>[y+d,x+e]).filter(([a,z])=>inb(a,z));
+  const pass=[];
+  for(const[a,z]of ring(r,c)){const q=a*8+z,p=b[q];if(p&&p!=='S'&&p[1]!=='K')pass.push(q)}
+  // empty squares beside destination d once passenger p (or none) has been lifted off
+  const spots=(d,p)=>{
+   const out=[];
+   for(const[a,z]of ring(d>>3,d&7)){
+    const q=a*8+z;
+    if(b[q]&&q!==p)continue;
+    if(p!=null&&b[p][1]==='P'&&(a===0||a===7))continue;   // pawns never end up on a back rank
+    out.push(q);
+   }
+   return out;
+  };
+  const dests=[];
+  for(const[dr,dc]of N){
+   const y=r+dr,x=c+dc;
+   if(!inb(y,x)||b[y*8+x])continue;
+   const d=y*8+x,ok=pass.length?pass.filter(p=>spots(d,p).length):(spots(d,null).length?[null]:[]);
+   if(ok.length)dests.push({d,ok});
+  }
+  if(dests.length){const o2=pick(dests);ch={t:o2.d,cap:false};carry={d:o2.d,p:pick(o2.ok)}}
  }else if(id==='096'){
   const live=q=>b[q]&&b[q]!=='S'&&'wb'.includes(b[q][0])&&b[q][1]!=='K';
   const tg=(sc.targets||[]).filter(live);
@@ -544,6 +571,18 @@ function scpTurn(s){
   b[from]='';b[ch.t]='S';sc.sq=ch.t;
   parts.push(`${me} moves to ${nm(ch.t)}`+(ch.cap?`, taking a ${pdesc(taken)}.`:'.'));
  }else if(id!=='330'&&id!=='914'&&!parts.length)parts.push(`${me} stays put.`);
+ if(carry&&carry.p!=null){
+  const pc=b[carry.p],py=carry.p>>3,px=carry.p&7,dy=carry.d>>3,dx=carry.d&7;
+  b[carry.p]='';
+  const free=[];
+  for(const[d,e]of K){const a=dy+d,z=dx+e;if(inb(a,z)&&!b[a*8+z]&&!(pc[1]==='P'&&(a===0||a===7)))free.push([a,z])}
+  const ty=dy+(py-r),tx=dx+(px-c);                       // same position relative to the horse as before
+  let spot=free.find(([a,z])=>a===ty&&z===tx);
+  if(!spot){const dd=([a,z])=>(a-ty)**2+(z-tx)**2,m=Math.min(...free.map(dd));spot=pick(free.filter(f=>dd(f)===m))}
+  const q=spot[0]*8+spot[1];
+  b[q]=pc;
+  parts.push(q===carry.p?`It carries the ${pdesc(pc)} along and sets it back down on ${nm(q)}.`:`It carries the ${pdesc(pc)} from ${nm(carry.p)} to ${nm(q)}.`);
+ }
  if(id==='049'){
   const cand=[];
   for(const[d,e]of K){
@@ -838,7 +877,7 @@ function show(name){
  $('menu').hidden=!m;$('gameScreen').hidden=m;
  document.body.classList.toggle('on-menu',m);
  window.scrollTo(0,0);
- if(m)updArrows();
+ if(m){updArrows();fitName()}
 }
 
 /* ---------- accounts and online play (Supabase) ---------- */
@@ -1068,19 +1107,30 @@ document.querySelectorAll('.soon').forEach(b=>b.onclick=()=>toast(b.dataset.msg)
 const scpGrid=$('scpgrid');
 function addScpChip(id,main,sub){
  const b=document.createElement('button');
- b.className='chip';b.setAttribute('role','radio');b.dataset.id=id;
+ b.className='chip'+(main.length>3?' long':'');b.setAttribute('role','radio');b.dataset.id=id;
  b.innerHTML=`<b>${main}</b><small>${sub}</small>`;
  b.onclick=()=>pickScp(id);scpGrid.appendChild(b);
+}
+function fitName(){
+ const el=$('scpname'),sp=$('scpfit');
+ sp.style.fontSize='';
+ const w=el.clientWidth-4;
+ if(w<=0)return;
+ const sw=sp.getBoundingClientRect().width;
+ if(sw<=w)return;
+ const px=parseFloat(getComputedStyle(sp).fontSize);
+ sp.style.fontSize=Math.max(px*0.72,px*w/sw*0.985)+'px';   // only the text shrinks; the line keeps its height
 }
 function pickScp(id){
  scpChoice=id;
  scpGrid.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-checked',String(c.dataset.id===id)));
  const sc=SCPS[id];
- $('scpname').textContent=sc?`${sc.name} · ${sc.title}`:'Random SCP';
+ $('scpfit').textContent=sc?`${sc.name} · ${sc.title}`:'Random SCP';
+ fitName();
  $('scpblurb').textContent=sc?sc.blurb:'A different SCP is chosen each game.';
 }
 addScpChip('','?','random');
-for(const k of Object.keys(SCPS).sort())addScpChip(k,k,'SCP');
+for(const k of Object.keys(SCPS).sort((a,b)=>a-b))addScpChip(k,k,'SCP');
 pickScp('');
 const scpPrev=$('scpPrev'),scpNext=$('scpNext');
 function updArrows(){
@@ -1088,7 +1138,7 @@ function updArrows(){
  scpNext.disabled=scpGrid.scrollLeft+scpGrid.clientWidth>=scpGrid.scrollWidth-2;
 }
 scpGrid.addEventListener('scroll',updArrows);
-window.addEventListener('resize',updArrows);
+window.addEventListener('resize',()=>{updArrows();fitName()});
 scpPrev.onclick=()=>scpGrid.scrollBy({left:-scpGrid.clientWidth,behavior:'smooth'});
 scpNext.onclick=()=>scpGrid.scrollBy({left:scpGrid.clientWidth,behavior:'smooth'});
 document.querySelectorAll('.timerbox .chip').forEach(ch=>ch.onclick=()=>{
