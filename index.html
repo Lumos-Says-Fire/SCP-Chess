@@ -289,6 +289,7 @@ button:hover{background:var(--hz);color:#111}
 const $=id=>document.getElementById(id);
 /* ---------- SCP definitions ---------- */
 const SCPS={
+ '3114':{name:'SCP-3114',title:'Wouldn’t it be Chilly?',blurb:'Wears the form of whatever it captures.',desc:'Moves like a king and actively hunts for a victim (never a king). It takes the body of whatever it captures, then moves like that piece, in secret, during the same turn as the player it is copying. Players cannot move it. A piece that captures it is captured instead, and 3114 takes that piece’s body. A king that tries to capture it only exposes it, and the king’s move is wasted. While disguised it only captures when it has no other move; if it can neither move nor capture, or reaches the last rank as a pawn, it discards its disguise. It can give fake checks and protect other pieces, but it can never cause a checkmate or stalemate.'},
  '1156':{name:'SCP-1156',title:'Wellington G. Wonderhorse',blurb:'A coach horse who gives nearby pieces a lift.',desc:'Moves like a knight, wandering at random, and never captures or moves kings. Whenever it moves, it carries one adjacent piece along and sets it down in the same position relative to itself, or in the nearest free spot beside it. It never moves to a square with no free space beside it.'},
  '096':{name:'SCP-096',title:'The Shy Guy',blurb:'Wanders calmly until attacked, then hunts its attackers.',desc:'Moves like a king, wandering at random. Once a piece (not a king) attacks it, it moves like a queen until every attacker has been captured. It only captures pieces that have attacked it, in the order they attacked.'},
  '018':{name:'SCP-018',title:'Super Ball',blurb:'Bounces diagonally across the board.',desc:'Moves like a bishop, always as far as it can go. Its first move is in a random direction; after that it bounces. Off a side wall it reverses horizontally, off the top or bottom wall (or after capturing a piece) it reverses vertically, and off a corner or a king it reverses both. It captures any non-king piece it runs into.'},
@@ -319,14 +320,14 @@ const TN={P:'pawn',N:'knight',B:'bishop',R:'rook',Q:'queen',K:'king'};
 const pdesc=p=>(p[0]==='w'?'white ':p[0]==='b'?'black ':'grey ')+TN[p[1]];
 
 /* ---------- rules ---------- */
-function attacked(b,sq,by){
+function attacked(b,sq,by,ign){
  const r=sq>>3,c=sq&7,pr=by==='w'?r+1:r-1;
- for(const dc of[-1,1])if(inb(pr,c+dc)&&b[pr*8+c+dc]===by+'P')return true;
- for(const[d,e]of N)if(inb(r+d,c+e)&&b[(r+d)*8+c+e]===by+'N')return true;
+ for(const dc of[-1,1])if(inb(pr,c+dc)&&b[pr*8+c+dc]===by+'P'&&pr*8+c+dc!==ign)return true;
+ for(const[d,e]of N)if(inb(r+d,c+e)&&b[(r+d)*8+c+e]===by+'N'&&(r+d)*8+c+e!==ign)return true;
  for(const[d,e]of K)if(inb(r+d,c+e)&&b[(r+d)*8+c+e]===by+'K')return true;
  for(const[ds,t]of[[ORTH,'R'],[DIAG,'B']])for(const[d,e]of ds){
   let y=r+d,x=c+e;
-  while(inb(y,x)){const p=b[y*8+x];if(p){if(p[0]===by&&(p[1]===t||p[1]==='Q'))return true;break}y+=d;x+=e}
+  while(inb(y,x)){const p=b[y*8+x];if(p){if(p[0]===by&&(p[1]===t||p[1]==='Q')&&y*8+x!==ign)return true;break}y+=d;x+=e}
  }
  return false;
 }
@@ -344,8 +345,8 @@ function attackersOf(b,sq){
  }
  return out;
 }
-function pseudo(s,color){
- const b=s.board,out=[],opp=other(color);
+function pseudo(s,color,incMask){
+ const b=s.board,out=[],opp=other(color),mk=s.scp.id==='3114'&&s.scp.mask?s.scp.sq:-1;
  const prot=sq=>s.scp.id==='999'&&dist(sq,s.scp.sq)<=1;
  const add=(f,t,x)=>out.push({f,t,...x});
  const tgt=(f,r,c)=>{
@@ -356,7 +357,7 @@ function pseudo(s,color){
   return 0;
  };
  for(let f=0;f<64;f++){
-  const p=b[f];if(!p||p[0]!==color)continue;
+  const p=b[f];if(!p||p[0]!==color||(f===mk&&!incMask))continue;
   const r=f>>3,c=f&7,t=p[1];
   if(t==='P'){
    const d=color==='w'?-1:1,start=color==='w'?6:1,last=color==='w'?0:7;
@@ -377,8 +378,8 @@ function pseudo(s,color){
    const row=color==='w'?7:0;
    if(f===row*8+4&&!attacked(b,f,opp)){
     const B=i=>b[row*8+i];
-    if(s.rights[color+'K']&&B(7)===color+'R'&&!B(5)&&!B(6)&&!attacked(b,row*8+5,opp)&&!attacked(b,row*8+6,opp))add(f,row*8+6,{castle:'K'});
-    if(s.rights[color+'Q']&&B(0)===color+'R'&&!B(1)&&!B(2)&&!B(3)&&!attacked(b,row*8+3,opp)&&!attacked(b,row*8+2,opp))add(f,row*8+2,{castle:'Q'});
+    if(s.rights[color+'K']&&B(7)===color+'R'&&row*8+7!==mk&&!B(5)&&!B(6)&&!attacked(b,row*8+5,opp)&&!attacked(b,row*8+6,opp))add(f,row*8+6,{castle:'K'});
+    if(s.rights[color+'Q']&&B(0)===color+'R'&&row*8+0!==mk&&!B(1)&&!B(2)&&!B(3)&&!attacked(b,row*8+3,opp)&&!attacked(b,row*8+2,opp))add(f,row*8+2,{castle:'Q'});
    }
   }else{
    const ds=t==='R'?ORTH:t==='B'?DIAG:K;
@@ -388,6 +389,13 @@ function pseudo(s,color){
  return out;
 }
 function apply(s,m,real){
+ if(real&&s.scp.id==='3114'&&s.scp.mask&&s.scp.sq>=0){
+  const p0=s.board[m.f];
+  if(p0[1]==='K'&&m.t===s.scp.sq&&s.board[m.t]&&s.board[m.t][0]!==p0[0]){
+   const b2=s.board.slice();b2[s.scp.sq]='S';   // a king cannot take an SCP: the disguise drops and the king's move is wasted
+   return{...s,board:b2,scp:{...s.scp,mask:null},trap:false,reveal:true,note:'',ep:-1,turn:other(p0[0])};
+  }
+ }
  const b=s.board.slice(),p=b[m.f],col=p[0],rights={...s.rights};
  b[m.t]=m.promo?col+(m.pick||'Q'):p;b[m.f]='';
  if(m.ep)b[m.f+((m.t&7)-(m.f&7))]='';
@@ -423,12 +431,30 @@ function apply(s,m,real){
   for(const q of att){tg.push(q);note+=`SCP-096 is attacked by the ${pdesc(b[q])} on ${nm(q)}. `}
   scp={...s.scp,targets:tg};
  }
+ let trap=false;
+ if(sid==='3114'&&s.scp.mask&&s.scp.sq>=0){
+  const capSq=m.ep?m.f+((m.t&7)-(m.f&7)):m.t;
+  if(capSq===s.scp.sq&&s.board[capSq]&&s.board[capSq][0]!==col){
+   trap=true;   // looks like an ordinary capture; really the attacker is taken and 3114 wears its form
+   scp=p[1]==='K'?{...s.scp,sq:-1,mask:null}:{...s.scp,sq:m.t,mask:{c:col,t:b[m.t][1]}};
+  }
+ }
  for(let i=0;i<64;i++)if(!b[i])marks[i]=0;
- return{...s,board:b,rights,marks,note:note.trim(),scp,ep:m.dp&&b[m.t]&&b[m.t][1]==='P'?(m.f+m.t)/2:-1,turn:other(col)};
+ return{...s,board:b,rights,marks,note:note.trim(),scp,trap,reveal:false,ep:m.dp&&b[m.t]&&b[m.t][1]==='P'?(m.f+m.t)/2:-1,turn:other(col)};
 }
 const kingSq=(b,c)=>b.indexOf(c+'K');
 const inCheck=(s,c)=>attacked(s.board,kingSq(s.board,c),other(c));
-const legal=(s,c)=>pseudo(s,c).filter(m=>!inCheck(apply(s,m),c));
+function legal(s,c){
+ const ps=pseudo(s,c);
+ let ms=ps.filter(m=>!inCheck(apply(s,m),c));
+ const sc=s.scp;
+ if(!ms.length&&sc.id==='3114'&&sc.mask&&sc.mask.c===other(c)&&sc.sq>=0){
+  // No legal move: if 3114's disguised piece is the reason (fake check, fake protection of a real attacker, fake cover of
+  // an escape square), its influence lifts. It can never cause checkmate or stalemate.
+  ms=ps.filter(m=>{const ns=apply(s,m);return !attacked(ns.board,kingSq(ns.board,c),other(c),sc.sq)});
+ }
+ return ms;
+}
 
 /* ---------- SCP behaviour ---------- */
 function greyOptions(b,f){
@@ -507,6 +533,16 @@ function scpTurn(s){
   }
  }else if(id==='999'){
   o=reach(K,1,false);ch=o.length?pick(o):null;
+ }else if(id==='3114'){
+  o=reach(K,1,true);
+  const caps=o.filter(x=>x.cap);
+  if(caps.length)ch=pick(caps);
+  else{const L=[];b.forEach((p,i)=>{if(p&&p!=='S'&&p[1]!=='K')L.push(i)});ch=o.length?best(o,L):null}   // heads for the nearest piece
+  if(ch&&ch.cap){
+   const taken=b[ch.t];
+   b[from]='';sc.sq=ch.t;sc.mask={c:taken[0],t:taken[1]};   // the captured piece's look stays on the board
+   parts.push(`${me} has vanished.`);ch=null;
+  }
  }else if(id==='1156'){
   // Knight moves to empty squares only. Carrying is incidental: a destination is chosen at random, then a passenger.
   const ring=(y,x)=>K.map(([d,e])=>[y+d,x+e]).filter(([a,z])=>inb(a,z));
@@ -668,7 +704,7 @@ function newGame(o){
  const id=forced||pick(Object.keys(SCPS));
  const sq=id==='330'||id==='914'?pick([27,28,35,36]):(3+(rng()*2|0))*8+(rng()<.5?0:7); // 330: center; others: ranks 4-5, a/h files
  b[sq]='S';
- G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0},dir:null,targets:[]},over:false,msg:''};
+ G={board:b,turn:'w',rights:{wK:1,wQ:1,bK:1,bQ:1},ep:-1,marks:Array(64).fill(0),note:'',clock:0,hist:{},scp:{id,sq,held:[],streak:{c:'',n:0},dir:null,targets:[],mask:null},over:false,msg:''};
  G.hist[posKey(G)]=1;
  resetClocks();
  sel=null;hints=[];lastScp=-1;
@@ -697,15 +733,39 @@ function askPromo(m){
  }
  box.hidden=false;opts.firstChild.focus();
 }
+// SCP-3114 in disguise: moves like the piece it copies, but never captures (that would give it away).
+function mimicMove(){
+ const sc=G.scp,c=sc.mask.c,T=sc.mask.t,from=sc.sq,side=c==='w'?'White':'Black';
+ const all=pseudo(G,c,true).filter(x=>x.f===from&&!x.ep&&!x.castle);
+ const safe=x=>{const b=G.board.slice();b[x.t]=b[x.f];b[x.f]='';return !attacked(b,kingSq(b,c),other(c))};
+ const quiet=all.filter(x=>!G.board[x.t]&&safe(x)),caps=all.filter(x=>G.board[x.t]&&safe(x));
+ const pool=quiet.length?quiet:caps;          // it only captures when it has no other move
+ if(!pool.length){                            // stuck: it drops the disguise and goes looking for a new one
+  const b=G.board.slice();b[from]='S';
+  G={...G,board:b,scp:{...sc,mask:null}};
+  return{log:null,reveal:true};
+ }
+ const x=pick(pool),b=G.board.slice(),took=b[x.t],rights={...G.rights};
+ b[x.t]=x.promo?'S':b[x.f];b[x.f]='';         // a pawn that reaches the last rank drops its disguise
+ for(const q of[x.f,x.t]){if(q===63)rights.wK=false;if(q===56)rights.wQ=false;if(q===7)rights.bK=false;if(q===0)rights.bQ=false}
+ G={...G,board:b,rights,scp:{...sc,sq:x.t,mask:x.promo?null:sc.mask}};   // a capture is an ordinary one: it keeps its disguise
+ return{log:`${side}: ${T==='P'?'':T}${nm(from)}${took?'x':'-'}${nm(x.t)}`,reveal:!!x.promo};
+}
 function play(m,opts){
  if(G.over)return;
  const who=G.turn,p=G.board[m.f],cap=G.board[m.t],sig0=sig(G),now=opts&&opts.at!=null?opts.at:clockNow();
  if(clk.running){clk[who]-=(now-clk.last)/1000;clk.last=now;if(clk[who]<=0){timeout(who);return}}
  G=apply(G,m,true);
  if(!clk.running){clk.running=true;clk.last=now}else clk[who]+=clk.inc;sel=null;hints=[];lastScp=-1;
- logs.push(`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`);
+ const realLog=G.reveal?`${who==='w'?'White':'Black'}: K${nm(m.f)} reaches for ${nm(m.t)}, but it was SCP-3114.`:`${who==='w'?'White':'Black'}: ${p[1]==='P'?'':p[1]}${nm(m.f)}${cap||m.ep?'x':'-'}${nm(m.t)}${m.promo?'='+(m.pick||'Q'):''}${m.castle?' (castles)':''}`;
+ let fake=null;
+ if(G.scp.id==='3114'&&G.scp.mask&&G.scp.mask.c===who&&!G.trap&&legal(G,other(who)).length)fake=mimicMove();
+ if(fake&&fake.log)logs.push(...(rng()<.5?[realLog,fake.log]:[fake.log,realLog]));   // random order: nobody can tell which move was 3114
+ else logs.push(realLog);
+ if(fake&&fake.reveal)logs.push('SCP-3114 sheds its disguise.');
+ const revealedNow=!!G.reveal||!!(fake&&fake.reveal);
  if(G.note)logs.push(G.note);
- if(who==='b'&&!finish(false)){
+ if(who==='b'&&G.scp.sq>=0&&!revealedNow&&!(G.scp.id==='3114'&&G.scp.mask)&&!finish(false)){
   const res=scpTurn(G);G=res.state;lastScp=res.moved;if(res.log)logs.push(res.log);
  }
  G.clock=(p[1]==='P'||sig(G)!==sig0)?0:G.clock+1;
@@ -719,7 +779,7 @@ function play(m,opts){
 const sig=s=>s.board.map((p,i)=>p&&p!=='S'?p+(s.marks[i]?'*':''):'').filter(Boolean).sort().join(',');
 function posKey(s){
  const ep=s.ep>=0&&pseudo(s,s.turn).some(m=>m.ep)?s.ep:-1,sc=s.scp;
- return s.board.map((p,i)=>p+(s.marks[i]?'*':'')).join(',')+'|'+s.turn+Object.values(s.rights).map(Number).join('')+ep+'|'+(sc.held||[]).slice().sort().join('')+(sc.streak?sc.streak.c+sc.streak.n:'')+(sc.dir?sc.dir.join(','):'')+(sc.targets||[]).join(',');
+ return s.board.map((p,i)=>p+(s.marks[i]?'*':'')).join(',')+'|'+s.turn+Object.values(s.rights).map(Number).join('')+ep+'|'+(sc.held||[]).slice().sort().join('')+(sc.streak?sc.streak.c+sc.streak.n:'')+(sc.dir?sc.dir.join(','):'')+(sc.targets||[]).join(',')+(sc.mask?`${sc.sq}${sc.mask.c}${sc.mask.t}`:'');
 }
 // Only bare kings are a dead position: the SCP can act as a blocker and 330 can upgrade pieces,
 // so king + minor piece can still mate. 106 can also bring captured pieces back.
