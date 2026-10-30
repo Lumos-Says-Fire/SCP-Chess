@@ -210,6 +210,11 @@ button:hover{background:var(--hz);color:#111}
   <dialog id="authDlg" class="menudlg" aria-labelledby="authTitle">
     <h2 id="authTitle">Account</h2>
     <p class="dmsg" id="authMsg"></p>
+    <div id="guestRow" hidden>
+      <p class="dmsg">You don’t need an account to join.</p>
+      <div class="drow"><button class="pill dbtn go" id="guestBtn" type="button" style="margin-top:0">Play as a guest</button></div>
+      <p class="dmsg" style="margin:calc(var(--u)*16) 0 calc(var(--u)*10)">Or log in:</p>
+    </div>
     <div class="drow" role="radiogroup" aria-label="Sign in or create account">
       <button type="button" class="chip" role="radio" aria-checked="true" data-g="auth" data-v="in"><b>Sign in</b></button>
       <button type="button" class="chip" role="radio" aria-checked="false" data-g="auth" data-v="up"><b>Create account</b></button>
@@ -225,6 +230,7 @@ button:hover{background:var(--hz);color:#111}
   <dialog id="accDlg" class="menudlg" aria-labelledby="accTitle">
     <h2 id="accTitle">Your account</h2>
     <p class="dmsg" id="accName"></p>
+    <div class="drow"><button class="pill dbtn go" id="accUp" type="button" hidden>Create account</button></div>
     <div class="drow"><button class="pill dbtn" id="accOut">Sign out</button><button class="pill dbtn go" id="accClose">Close</button></div>
   </dialog>
   <dialog id="onDlg" class="menudlg" aria-labelledby="onTitle">
@@ -963,7 +969,7 @@ async function loadProfile(){
  $('loginText').textContent=profile?profile.username:'Login/Register';
 }
 async function afterAuth(){
- if(!me){if(pendingJoin&&!$('authDlg').open){setAuthTab('in');openAuth('Log in or create an account to join this game.')}return}
+ if(!me){if(pendingJoin&&!$('authDlg').open){setAuthTab('in');openAuth('You’ve been invited to a game.')}return}
  if(pendingJoin){const id=pendingJoin;pendingJoin=null;await joinById(id);return}
  if(afterLogin==='online'){afterLogin=null;openOnline();return}
  if(!autoResumed){autoResumed=true;const g=await findActive();if(g)startOnline(g)}
@@ -972,6 +978,7 @@ if(sb)sb.auth.onAuthStateChange(()=>setTimeout(async()=>{try{await loadProfile()
 
 function openAuth(msg,after){
  afterLogin=after||null;$('authMsg').textContent=msg||'';setErr('authErr','');
+ $('guestRow').hidden=!pendingJoin;   // guests are only offered when joining an invite link
  $('authDlg').showModal();
 }
 function setAuthTab(t){authTab=t;radio('authDlg','auth',t);$('authNickRow').hidden=t!=='up'}
@@ -998,22 +1005,43 @@ $('authForm').onsubmit=async e=>{
  }catch(er){setErr('authErr',er.message||String(er))}
  finally{$('authGo').disabled=false}
 };
+$('guestBtn').onclick=async()=>{
+ setErr('authErr','');$('guestBtn').disabled=true;
+ try{
+  const r=await sb.auth.signInAnonymously();
+  if(r.error)throw r.error;
+  $('authDlg').close();   // the sign-in event then joins the invited game
+ }catch(er){setErr('authErr',/anonymous/i.test(er.message||'')?'Guest play is not available right now.':(er.message||String(er)))}
+ finally{$('guestBtn').disabled=false}
+};
+const isGuest=()=>!!(me&&me.is_anonymous);
+$('accUp').onclick=()=>{$('accDlg').close();setAuthTab('up');openAuth('Create an account to host games and use quick match.')};
 $('loginBtn').onclick=()=>{
  if(!sb){toast('Online services are unavailable right now.');return}
- if(profile){$('accName').textContent=`Signed in as ${profile.username}`;$('accDlg').showModal()}
+ if(profile){
+  $('accName').textContent=isGuest()?`Playing as ${profile.username} (guest). Guests can join invite links but can’t host games or use quick match.`:`Signed in as ${profile.username}`;
+  $('accUp').hidden=!isGuest();$('accDlg').showModal()}
  else{setAuthTab('in');openAuth('')}
 };
 $('accClose').onclick=()=>$('accDlg').close();
-$('accOut').onclick=async()=>{await sb.auth.signOut();$('accDlg').close();me=profile=null;$('loginText').textContent='Login/Register'};
+$('accOut').onclick=async()=>{
+ if(isGuest()&&!confirm('Sign out? As a guest you will not be able to get back into your current game.'))return;
+ await sb.auth.signOut();$('accDlg').close();me=profile=null;$('loginText').textContent='Login/Register';
+};
 
 /* ----- finding and starting games ----- */
 async function findActive(){
  const r=await sb.from('games').select('*').eq('status','active').or(`white.eq.${me.id},black.eq.${me.id}`).order('created_at',{ascending:false}).limit(1);
  return r.data&&r.data[0]||null;
 }
-function openOnline(){
+async function openOnline(){
  if(!sb){toast('Online services are unavailable right now.');return}
  if(!me){setAuthTab('in');openAuth('Log in or create an account to play online.','online');return}
+ if(isGuest()){   // guests can only rejoin the game they were invited to
+  const g=await findActive().catch(()=>null);
+  if(g){startOnline(g);return}
+  setAuthTab('up');openAuth('Guests can only join invite links. Create an account to host games or use quick match.');return;
+ }
  $('onSummary').textContent=`SCP: ${scpChoice?SCPS[scpChoice].name:'Random'}  ·  Time: ${timeCtl.label}`;
  setErr('onErr','');setOnView('choose');$('onResume').hidden=true;$('onDlg').showModal();
  findActive().then(g=>{if(g){$('onResume').hidden=false;$('onResume').onclick=()=>{waitGame=null;$('onDlg').close();startOnline(g)}}}).catch(()=>{});
